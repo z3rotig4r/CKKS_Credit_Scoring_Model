@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #00ff00;
+        }
+        .log {
+            margin: 5px 0;
+            padding: 5px;
+            background: #2a2a2a;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .info { color: #00aaff; }
+        button {
+            margin: 10px 5px;
+            padding: 10px 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>WASM Module Test</h1>
+    <div id="logs"></div>
+    <div style="margin-top: 20px;">
+        <button onclick="testWasm()">Test WASM Load</button>
+        <button onclick="testKeygen()">Test Keygen</button>
+        <button onclick="testEncryptDecrypt()">Test Encrypt/Decrypt</button>
+    </div>
+
+    <script src="/wasm_exec.js"></script>
+    <script>
+        const log = (msg, type = 'info') => {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            document.getElementById('logs').appendChild(div);
+            console.log(msg);
+        };
+
+        let wasmInstance = null;
+        let go = null;
+
+        async function loadWasm() {
+            try {
+                log('Loading WASM module...', 'info');
+                
+                if (!window.Go) {
+                    throw new Error('Go class not found');
+                }
+
+                go = new Go();
+                const response = await fetch('/main.wasm');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch WASM: ${response.status}`);
+                }
+                
+                log(`WASM file size: ${(await response.clone().blob()).size / 1024 / 1024} MB`, 'info');
+                
+                const wasmBytes = await response.arrayBuffer();
+                const result = await WebAssembly.instantiate(wasmBytes, go.importObject);
+                wasmInstance = result.instance;
+
+                log('Running WASM...', 'info');
+                go.run(wasmInstance);
+
+                // Wait for functions to be registered
+                log('Waiting for FHE functions...', 'info');
+                const maxWait = 5000;
+                const startTime = Date.now();
+                
+                while (Date.now() - startTime < maxWait) {
+                    if (typeof window.fheKeygen === 'function') {
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+
+                if (typeof window.fheKeygen !== 'function') {
+                    throw new Error('FHE functions not registered after 5s');
+                }
+
+                log('✅ WASM loaded successfully!', 'success');
+                
+                // List available functions
+                const fheFunctions = Object.keys(window).filter(k => k.startsWith('fhe'));
+                log(`Available functions: ${fheFunctions.join(', ')}`, 'info');
+                
+                // Get params
+                if (typeof window.fheGetParamsInfo === 'function') {
+                    const params = JSON.parse(window.fheGetParamsInfo());
+                    log(`Parameters: ${JSON.stringify(params)}`, 'info');
+                }
+
+                return true;
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+                return false;
+            }
+        }
+
+        async function testWasm() {
+            await loadWasm();
+        }
+
+        async function testKeygen() {
+            try {
+                if (!wasmInstance) {
+                    await loadWasm();
+                }
+                
+                log('Generating keys...', 'info');
+                const keys = await window.fheKeygen();
+                log(`✅ Keys generated! SK: ${keys.secretKey.length} bytes, PK: ${keys.publicKey.length} bytes`, 'success');
+            } catch (error) {
+                log(`❌ Keygen error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEncryptDecrypt() {
+            try {
+                if (!wasmInstance) {
+                    await loadWasm();
+                }
+                
+                log('Generating keys...', 'info');
+                const keys = await window.fheKeygen();
+                
+                const value = 42.5;
+                log(`Encrypting value: ${value}`, 'info');
+                const ct = await window.fheEncrypt(keys.publicKey, value);
+                log(`✅ Encrypted! Ciphertext: ${ct.length} bytes`, 'success');
+                
+                log('Decrypting...', 'info');
+                const decrypted = await window.fheDecrypt(keys.secretKey, ct);
+                log(`✅ Decrypted: ${decrypted} (error: ${Math.abs(decrypted - value).toFixed(6)})`, 'success');
+            } catch (error) {
+                log(`❌ Encrypt/Decrypt error: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, starting WASM load...', 'info');
+            loadWasm();
+        });
+    </script>
+</body>
+</html>

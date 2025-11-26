@@ -1,0 +1,65 @@
+import React from 'react';
+import { FHEProvider } from './contexts/FHEContext';
+import CreditInputForm from './components/CreditInputForm';
+
+function App() {
+  const appStyle = {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '48px 16px',
+  };
+
+  const containerStyle = {
+    maxWidth: '960px',
+    margin: '0 auto',
+  };
+
+  const headerStyle = {
+    textAlign: 'center' as const,
+    marginBottom: '48px',
+  };
+
+  const titleStyle = {
+    fontSize: '48px',
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: '16px',
+  };
+
+  const subtitleStyle = {
+    fontSize: '20px',
+    color: 'rgba(255, 255, 255, 0.9)',
+  };
+
+  const footerStyle = {
+    marginTop: '48px',
+    textAlign: 'center' as const,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: '14px',
+  };
+
+  return (
+    <FHEProvider>
+      <div style={appStyle}>
+        <div style={containerStyle}>
+          <div style={headerStyle}>
+            <h1 style={titleStyle}>
+              🔒 Private Credit Scoring
+            </h1>
+            <p style={subtitleStyle}>
+              Homomorphic Encryption Powered by CKKS
+            </p>
+          </div>
+
+          <CreditInputForm />
+
+          <div style={footerStyle}>
+            <p>Built with Lattigo CKKS • WebAssembly • React + TypeScript</p>
+          </div>
+        </div>
+      </div>
+    </FHEProvider>
+  );
+}
+
+export default App;
