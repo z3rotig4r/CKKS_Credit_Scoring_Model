@@ -55,45 +55,57 @@ func (c *ChebyshevApprox) RequiredDepth() int {
 }
 
 func (c *ChebyshevApprox) Evaluate(evaluator *ckks.Evaluator, ct *rlwe.Ciphertext, params ckks.Parameters) (*rlwe.Ciphertext, error) {
-	// Compute polynomial using Horner's method
-	// p(x) = c0 + c1*x + c2*x^2 + ... + cn*x^n
+	// Compute polynomial: c0 + c1*x + c2*x^2 + c3*x^3 + ...
+	// Compute powers of x first, then weighted sum
 
 	encoder := ckks.NewEncoder(params)
+	values := make([]complex128, params.MaxSlots())
 
-	// Start with the highest degree coefficient
-	n := len(c.coeffs) - 1
-	result := ct.CopyNew()
+	// Start with constant term c0
+	for i := range values {
+		values[i] = complex(c.coeffs[0], 0)
+	}
+	constPt := ckks.NewPlaintext(params, params.MaxLevel())
+	encoder.Encode(values, constPt)
+	result, _ := evaluator.MulNew(ct, constPt) // Dummy multiplication to get ciphertext
+	// Actually, start from plaintext
+	resultPt := ckks.NewPlaintext(params, params.MaxLevel())
+	encoder.Encode(values, resultPt)
 
-	// Scale by last coefficient
-	if c.coeffs[n] != 0 {
-		constPt := ckks.NewPlaintext(params, result.Level())
-		values := make([]complex128, params.MaxSlots())
+	// Add c1*x
+	if len(c.coeffs) > 1 && c.coeffs[1] != 0 {
 		for i := range values {
-			values[i] = complex(c.coeffs[n], 0)
+			values[i] = complex(c.coeffs[1], 0)
 		}
-		encoder.Encode(values, constPt)
-		evaluator.Mul(result, constPt, result)
+		c1Pt := ckks.NewPlaintext(params, ct.Level())
+		encoder.Encode(values, c1Pt)
+		result, _ = evaluator.MulNew(ct, c1Pt)
 		evaluator.Rescale(result, result)
+		evaluator.Add(result, resultPt, result)
 	}
 
-	// Horner's method: iteratively compute result = result*x + c[i]
-	for i := n - 1; i >= 0; i-- {
-		if i < n-1 {
-			// Multiply by x
-			evaluator.Mul(result, ct, result)
-			evaluator.Rescale(result, result)
+	// Compute x^2, x^3, etc. and add weighted terms
+	xPower := ct.CopyNew()
+	for i := 2; i < len(c.coeffs); i++ {
+		if c.coeffs[i] == 0 {
+			continue
 		}
 
-		// Add coefficient c[i]
-		if c.coeffs[i] != 0 {
-			constPt := ckks.NewPlaintext(params, result.Level())
-			values := make([]complex128, params.MaxSlots())
-			for j := range values {
-				values[j] = complex(c.coeffs[i], 0)
-			}
-			encoder.Encode(values, constPt)
-			evaluator.Add(result, constPt, result)
+		// Compute x^i
+		evaluator.Mul(xPower, ct, xPower)
+		evaluator.Rescale(xPower, xPower)
+
+		// Multiply by coefficient
+		for j := range values {
+			values[j] = complex(c.coeffs[i], 0)
 		}
+		ciPt := ckks.NewPlaintext(params, xPower.Level())
+		encoder.Encode(values, ciPt)
+		term, _ := evaluator.MulNew(xPower, ciPt)
+		evaluator.Rescale(term, term)
+
+		// Add to result
+		evaluator.Add(result, term, result)
 	}
 
 	return result, nil
@@ -143,35 +155,30 @@ func (m *MinimaxApprox) Evaluate(evaluator *ckks.Evaluator, ct *rlwe.Ciphertext,
 
 	// Start with the highest degree coefficient
 	n := len(m.coeffs) - 1
-	result := ct.CopyNew()
 
-	// Scale by last coefficient
-	if m.coeffs[n] != 0 {
-		constPt := ckks.NewPlaintext(params, result.Level())
-		values := make([]complex128, params.MaxSlots())
-		for i := range values {
-			values[i] = complex(m.coeffs[n], 0)
-		}
-		encoder.Encode(values, constPt)
-		evaluator.Mul(result, constPt, result)
-		evaluator.Rescale(result, result)
+	// Initialize result with highest coefficient
+	values := make([]complex128, params.MaxSlots())
+	for i := range values {
+		values[i] = complex(m.coeffs[n], 0)
 	}
+	constPt := ckks.NewPlaintext(params, params.MaxLevel())
+	encoder.Encode(values, constPt)
+	result, _ := evaluator.MulNew(ct, constPt)
+	evaluator.Rescale(result, result)
 
 	// Horner's method
 	for i := n - 1; i >= 0; i-- {
-		if i < n-1 {
-			evaluator.Mul(result, ct, result)
-			evaluator.Rescale(result, result)
-		}
+		temp := ct.CopyNew()
+		evaluator.Mul(result, temp, result)
+		evaluator.Rescale(result, result)
 
 		if m.coeffs[i] != 0 {
-			constPt := ckks.NewPlaintext(params, result.Level())
-			values := make([]complex128, params.MaxSlots())
+			constPt2 := ckks.NewPlaintext(params, result.Level())
 			for j := range values {
 				values[j] = complex(m.coeffs[i], 0)
 			}
-			encoder.Encode(values, constPt)
-			evaluator.Add(result, constPt, result)
+			encoder.Encode(values, constPt2)
+			evaluator.Add(result, constPt2, result)
 		}
 	}
 

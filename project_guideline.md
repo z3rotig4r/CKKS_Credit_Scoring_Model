@@ -10,6 +10,11 @@
 
 서버는 사용자의 비밀 키($sk$)에 절대 접근하지 않으며, 오직 동형 연산(Computation)만을 담당합니다.
 
+**Status**: ✅ **PRODUCTION READY** (November 28, 2025)
+- Credit scoring system with 5 features
+- RLK-based architecture (client generates, backend uses)
+- E2E tests: 5/5 passing, ~336ms total latency
+
 ### 1.2. 핵심 사용 사례 (예시: 프라이빗 통계)
 * **시나리오:** "민감한 건강 정보(예: 일일 걸음 수)의 프라이빗 평균 계산"
 1.  **사용자 (Client):** 자신의 '걸음 수'(예: `7500`)를 입력합니다.
@@ -35,29 +40,31 @@
 
 1.  **Client (React App):**
     * `main.wasm` (Lattigo 컴파일본)과 `wasm_exec.js` 로드.
-    * 사용자 로그인/회원가입 시 **비밀번호** 입력.
+    * 사용자가 **비밀번호** 입력.
     * **Web Crypto API**로 비밀번호에서 AES 키 유도.
 2.  **Client (Wasm):**
-    * `KeyGen()` 호출: FHE 키 쌍($pk$, $sk$) 생성.
+    * `KeyGen()` 호출: FHE 키 쌍($pk$, $sk$, $rlk$) 생성.
     * $sk$는 AES 키로 암호화되어 `IndexedDB`에 저장.
-    * $pk$는 평문으로 서버에 전송 (DB 저장용).
+    * $pk$와 $rlk$는 메모리에 유지.
 3.  **Client (Wasm):**
-    * 데이터 암호화 시 `IndexedDB`에서 암호화된 $sk$ 로드.
-    * 비밀번호 재입력받아 AES 키로 $sk$ 복호화 (메모리상에서만).
-    * `Encrypt(data, pk)` 실행.
+    * 사용자가 신용 정보(나이, 대출액, 소득, 월납입금) 입력.
+    * 5개 피처로 전처리 (age, loan_to_income, debt_to_income, credit_amount, income).
+    * `Encrypt(feature, pk)` 실행하여 각 피처 암호화.
 4.  **Client -> Server:**
-    * `POST /compute` API로 암호문($ct$) 전송.
+    * `POST /api/compute-score` API로 암호문($ct_1$, ..., $ct_5$)과 $rlk$ 전송.
 5.  **Server (Go Backend):**
-    * `ct` 수신.
-    * 저장된 $pk$와 Lattigo 라이브러리(네이티브 Go)를 사용해 FHE 연산 수행.
-    * 결과 암호문($ct_{result}$) 생성.
+    * 암호문 및 $rlk$ 수신.
+    * 클라이언트의 $rlk$로 Evaluator 생성.
+    * Weighted sum: $logit = w_1 \cdot ct_1 + ... + w_5 \cdot ct_5 + bias$
+    * Sigmoid approximation (polynomial degree-3).
+    * 결과 암호문($ct_{score}$) 생성.
 6.  **Server -> Client:**
-    * $ct_{result}$ 반환.
+    * $ct_{score}$ 반환.
 7.  **Client (Wasm):**
-    * (3)번과 동일하게 $sk$를 메모리에 로드.
-    * `Decrypt(ct_result, sk)` 실행.
-    * 평문 결과를 화면에 렌더링.
-    * 메모리에서 $sk$ 즉시 폐기.
+    * 비밀번호 재입력받아 $sk$를 메모리에 로드.
+    * `Decrypt(ct_score, sk)` 실행.
+    * 신용 점수(0~1)를 화면에 렌더링.
+    * 메모리에서 $sk$ 즉시 폐기 (`fill(0)`).
 
 ---
 

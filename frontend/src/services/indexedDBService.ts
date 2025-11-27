@@ -18,10 +18,11 @@ interface KeyData {
   timestamp: number;
 }
 
-interface StoredKeys {
+export interface StoredKeys {
   secretKey: Uint8Array;
   publicKey: Uint8Array;
-  relinKey?: Uint8Array;
+  relinearizationKey?: Uint8Array;
+  relinKey?: Uint8Array; // Deprecated alias
   galoisKeys?: Uint8Array;
 }
 
@@ -292,4 +293,3 @@ class IndexedDBService {
 }
 
 export const indexedDBService = new IndexedDBService();
-export type { StoredKeys };

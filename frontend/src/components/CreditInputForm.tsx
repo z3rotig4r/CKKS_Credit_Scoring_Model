@@ -12,7 +12,7 @@ interface FormData {
 }
 
 const CreditInputForm: React.FC = () => {
-  const { encrypt, decrypt, sendToBackend, isReady, timings, generateKeys, loadStoredKeys, hasStoredKeys } = useFHE();
+  const { encrypt, encryptMultiple, decrypt, sendToBackend, isReady, timings, generateKeys, loadStoredKeys, hasStoredKeys, supportsParallelEncryption } = useFHE();
 
   const initialFormData: FormData = {};
   CREDIT_FEATURES.forEach((feature) => {
@@ -28,6 +28,7 @@ const CreditInputForm: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [passwordAction, setPasswordAction] = useState<'generate' | 'load'>('generate');
+  const [encryptionProgress, setEncryptionProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleInputChange = (name: string, value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -84,11 +85,27 @@ const CreditInputForm: React.FC = () => {
 
     try {
       const preprocessedFeatures = preprocessFeatures(formData);
-      const encryptedFeatures = await Promise.all(
-        preprocessedFeatures.map((f) => encrypt(f))
-      );
+      
+      // Always use encryptMultiple for proper timing tracking
+      console.log('🔄 Encrypting features...');
+      const encryptedFeatures = await encryptMultiple(preprocessedFeatures, (current, total) => {
+        setEncryptionProgress({ current, total });
+      });
+      
+      setEncryptionProgress(null);
+      console.log('📤 Sending encrypted features to backend...');
+      console.log('📊 Input features (preprocessed):', preprocessedFeatures);
+      
       const encryptedScore = await sendToBackend(encryptedFeatures);
+      
+      console.log('📥 Received encrypted score from backend');
+      console.log('🔓 Decrypting score...');
+      
       const score = await decrypt(encryptedScore);
+      
+      console.log('✅ Final credit score:', score);
+      console.log('📈 Score as percentage:', (score * 100).toFixed(2) + '%');
+      
       setResult(score);
     } catch (error: any) {
       let userMessage = 'Failed to compute credit score';
@@ -369,7 +386,12 @@ const CreditInputForm: React.FC = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <span>Computing Encrypted Score...</span>
+                <span>
+                  {encryptionProgress 
+                    ? `⚡ Encrypting feature ${encryptionProgress.current}/${encryptionProgress.total}...`
+                    : 'Computing Encrypted Score...'
+                  }
+                </span>
               </>
             ) : (
               <>

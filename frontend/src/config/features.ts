@@ -29,92 +29,77 @@ export interface PreprocessingConfig {
 }
 
 /**
- * Default credit scoring features
- * Can be easily modified to add/remove features
+ * Production credit scoring features (4 user inputs → 5 model features)
+ * AUC-ROC: 0.5886, All coefficients CKKS-safe
+ * NOTE: EXT_SOURCE_2 제거! 우리가 신용점수를 계산하는 시스템이므로!
+ * 
+ * User provides 4 inputs:
+ * 1. age: Age in years
+ * 2. loanAmount: Requested loan amount (KRW)
+ * 3. income: Annual income (KRW)
+ * 4. monthlyPayment: Expected monthly payment (KRW)
+ * 
+ * Backend model expects 5 features:
+ * [age/10, loan_to_income, debt_to_income, credit_amount, income/100000]
  */
 export const CREDIT_FEATURES: FeatureConfig[] = [
   {
     name: 'age',
-    label: 'Age',
+    label: 'Age (years)',
     type: 'number',
     min: 18,
-    max: 100,
+    max: 70,
     step: 1,
-    defaultValue: 30,
+    defaultValue: 40,
+    unit: 'years',
     preprocessing: {
       method: 'normalize',
-      params: { scale: 100 }, // age / 100
+      params: { scale: 10 }, // age / 10 → 결과: 1.8 ~ 7.0
     },
     description: 'Applicant age in years',
   },
   {
-    name: 'income',
-    label: 'Annual Income',
-    type: 'number',
-    min: 0,
-    max: 1000000,
-    step: 1000,
-    defaultValue: 50000,
-    preprocessing: {
-      method: 'normalize',
-      params: { scale: 100000 }, // income / 100000
-    },
-    description: 'Annual income in dollars',
-  },
-  {
-    name: 'creditHistory',
-    label: 'Credit History (months)',
-    type: 'number',
-    min: 0,
-    max: 600,
-    step: 1,
-    defaultValue: 60,
-    preprocessing: {
-      method: 'normalize',
-      params: { scale: 120 }, // creditHistory / 120 (10 years)
-    },
-    description: 'Length of credit history in months',
-  },
-  {
     name: 'loanAmount',
-    label: 'Requested Loan Amount',
+    label: 'Requested Loan Amount (KRW)',
     type: 'number',
-    min: 0,
-    max: 500000,
-    step: 1000,
-    defaultValue: 25000,
+    min: 1000000,
+    max: 50000000,
+    step: 1000000,
+    defaultValue: 10000000,
+    unit: 'KRW',
     preprocessing: {
-      method: 'normalize',
-      params: { scale: 50000 }, // loanAmount / 50000
+      method: 'none', // Will be used in ratio calculation
     },
-    description: 'Requested loan amount in dollars',
+    description: 'Loan amount requested (used for ratio calculation)',
   },
   {
-    name: 'employmentYears',
-    label: 'Years of Employment',
+    name: 'income',
+    label: 'Annual Income (KRW)',
     type: 'number',
-    min: 0,
-    max: 50,
-    step: 1,
-    defaultValue: 5,
+    min: 10000000,
+    max: 200000000,
+    step: 1000000,
+    defaultValue: 50000000,
+    unit: 'KRW',
     preprocessing: {
       method: 'normalize',
-      params: { scale: 40 }, // employmentYears / 40
+      params: { scale: 100000 }, // income / 100000 → 결과: 100 ~ 2000
     },
-    description: 'Years at current employment',
+    description: 'Annual income in KRW',
   },
   {
-    name: 'debtToIncome',
-    label: 'Debt-to-Income Ratio',
+    name: 'monthlyPayment',
+    label: 'Expected Monthly Payment (KRW)',
     type: 'number',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: 0.3,
+    min: 100000,
+    max: 10000000,
+    step: 100000,
+    defaultValue: 1000000,
+    unit: 'KRW',
     preprocessing: {
-      method: 'none', // Already in [0, 1] range
+      method: 'none', // Will be used in debt_to_income calculation
     },
-    description: 'Ratio of monthly debt to monthly income',
+    description: 'Expected monthly loan payment',
   },
 ];
 
@@ -154,15 +139,37 @@ export function preprocessFeature(
 
 /**
  * Preprocess all features based on their configurations
+ * Returns 5 features matching backend model:
+ * [age, loan_to_income, debt_to_income, credit_amount, income]
+ * NOTE: EXT_SOURCE_2 제거! 우리가 신용점수를 계산하는 시스템이므로!
  */
 export function preprocessFeatures(
   rawData: Record<string, number>
 ): number[] {
-  return CREDIT_FEATURES.map((feature) => {
-    const rawValue = rawData[feature.name] || feature.defaultValue;
-    const value = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue));
-    return preprocessFeature(value, feature.preprocessing);
-  });
+  // Extract raw values (only 4 inputs from user)
+  const age = rawData['age'] || 40;
+  const loanAmount = rawData['loanAmount'] || 10000000;
+  const income = rawData['income'] || 50000000;
+  const monthlyPayment = rawData['monthlyPayment'] || 1000000;
+  
+  // Feature 1: age / 10
+  const f1_age = age / 10;
+  
+  // Feature 2: loan_to_income ratio (clip to 0-10)
+  const f2_loan_to_income = Math.min(10, Math.max(0, loanAmount / income));
+  
+  // Feature 3: debt_to_income ratio * 100 (clip to 0-100)
+  // Monthly payment / Monthly income * 100
+  const monthlyIncome = income / 12;
+  const f3_debt_to_income = Math.min(100, Math.max(0, (monthlyPayment / monthlyIncome) * 100));
+  
+  // Feature 4: credit_amount / 100000
+  const f4_credit_amount = loanAmount / 100000;
+  
+  // Feature 5: income / 100000
+  const f5_income = income / 100000;
+  
+  return [f1_age, f2_loan_to_income, f3_debt_to_income, f4_credit_amount, f5_income];
 }
 
 /**

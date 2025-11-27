@@ -3,6 +3,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export interface InferenceRequest {
   encryptedFeatures: string[]; // Base64 encoded
+  relinearizationKey: string; // Base64 encoded
 }
 
 export interface InferenceResponse {
@@ -11,7 +12,7 @@ export interface InferenceResponse {
 }
 
 export const creditAPI = {
-  async computeScore(encryptedFeatures: Uint8Array[]): Promise<Uint8Array> {
+  async computeScore(encryptedFeatures: Uint8Array[], relinearizationKey: Uint8Array): Promise<Uint8Array> {
     // Convert Uint8Array to base64
     const base64Features = encryptedFeatures.map(arr => {
       // Handle large arrays by chunking to avoid call stack overflow
@@ -24,12 +25,24 @@ export const creditAPI = {
       return btoa(binary);
     });
 
+    // Convert RLK to base64
+    let rlkBinary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < relinearizationKey.length; i += chunkSize) {
+      const chunk = relinearizationKey.subarray(i, Math.min(i + chunkSize, relinearizationKey.length));
+      rlkBinary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    const base64RLK = btoa(rlkBinary);
+
     const response = await fetch(`${API_BASE_URL}/api/inference`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ encryptedFeatures: base64Features }),
+      body: JSON.stringify({ 
+        encryptedFeatures: base64Features,
+        relinearizationKey: base64RLK,
+      }),
     });
 
     if (!response.ok) {

@@ -1,0 +1,378 @@
+========================================================================
+🔬 CKKS NOISE ANALYSIS BENCHMARK
+   Testing: Logistic Regression with FULL Sigmoid Transformation
+   Model: 5 features (age, loan_to_income, debt_to_income, credit_amount, income)
+========================================================================
+
+⚙️  CKKS Configuration:
+   LogN:            14 (Ring dimension: 16384)
+   LogQ:            200.0000021067887
+   LogP:            60.99999999999873
+   LogDefaultScale: 40 (Scale: 2^40)
+   MaxLevel:        3
+   MaxSlots:        8192
+
+========================================================================
+🔬 NOISE BENCHMARK WITH SIGMOID TRANSFORMATION
+========================================================================
+⚠️  CRITICAL: Testing FULL logistic regression (logit + sigmoid)
+⚠️  This benchmark NEVER uses raw logit values
+========================================================================
+
+📊 Test Cases Summary:
+-------------------------------------------------------------------
+1. Low Risk Customer
+   Features: [0.45 0.15 0.2 0.5 0.8]
+   Logit: -1.538030
+   Expected Probability: 0.176822
+
+2. Medium Risk Customer
+   Features: [0.3 0.35 0.45 1.2 0.5]
+   Logit: -1.526424
+   Expected Probability: 0.178518
+
+3. High Risk Customer
+   Features: [0.25 0.55 0.6 2 0.35]
+   Logit: -1.544399
+   Expected Probability: 0.175897
+
+4. Very Low Risk (Conservative)
+   Features: [0.55 0.1 0.15 0.3 1]
+   Logit: -1.554559
+   Expected Probability: 0.174429
+
+5. Boundary Case (Near 0.5)
+   Features: [0.35 0.3 0.35 0.8 0.6]
+   Logit: -1.523158
+   Expected Probability: 0.178997
+
+6. Edge Case: Very High Logit
+   Features: [5 3.5 5 0 8]
+   Logit: -2.504313
+   Expected Probability: 0.075556
+
+7. Edge Case: Very Low Logit
+   Features: [0.1 0.1 0.1 5 0.1]
+   Logit: -1.648838
+   Expected Probability: 0.161266
+
+
+======================================================================
+🧪 Testing: Low Risk Customer
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.4500
+   Feature 1: Level=3, Value=0.1500
+   Feature 2: Level=3, Value=0.2000
+   Feature 3: Level=3, Value=0.5000
+   Feature 4: Level=3, Value=0.8000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.5380295597
+   Encrypted Logit: -1.5456079366
+   Logit Error:     7.5783769107e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1768219014
+   Encrypted Probability: -0.0000000000
+   Absolute Error:        1.7682190141e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.7682190141e-01
+
+======================================================================
+🧪 Testing: Medium Risk Customer
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.3000
+   Feature 1: Level=3, Value=0.3500
+   Feature 2: Level=3, Value=0.4500
+   Feature 3: Level=3, Value=1.2000
+   Feature 4: Level=3, Value=0.5000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.5264238959
+   Encrypted Logit: -1.5136648707
+   Logit Error:     1.2759025165e-02
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1785175151
+   Encrypted Probability: -0.0000000000
+   Absolute Error:        1.7851751514e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.7851751514e-01
+
+======================================================================
+🧪 Testing: High Risk Customer
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.2500
+   Feature 1: Level=3, Value=0.5500
+   Feature 2: Level=3, Value=0.6000
+   Feature 3: Level=3, Value=2.0000
+   Feature 4: Level=3, Value=0.3500
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.5443990811
+   Encrypted Logit: -1.5374855247
+   Logit Error:     6.9135563624e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1758966876
+   Encrypted Probability: -0.0000000000
+   Absolute Error:        1.7589668755e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.7589668755e-01
+
+======================================================================
+🧪 Testing: Very Low Risk (Conservative)
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.5500
+   Feature 1: Level=3, Value=0.1000
+   Feature 2: Level=3, Value=0.1500
+   Feature 3: Level=3, Value=0.3000
+   Feature 4: Level=3, Value=1.0000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.5545590649
+   Encrypted Logit: -1.5601692141
+   Logit Error:     5.6101492250e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1744287726
+   Encrypted Probability: -0.0000000000
+   Absolute Error:        1.7442877265e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.7442877265e-01
+
+======================================================================
+🧪 Testing: Boundary Case (Near 0.5)
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.3500
+   Feature 1: Level=3, Value=0.3000
+   Feature 2: Level=3, Value=0.3500
+   Feature 3: Level=3, Value=0.8000
+   Feature 4: Level=3, Value=0.6000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.5231577653
+   Encrypted Logit: -1.5192563792
+   Logit Error:     3.9013860632e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1789969930
+   Encrypted Probability: 0.0000000000
+   Absolute Error:        1.7899699300e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.7899699300e-01
+
+======================================================================
+🧪 Testing: Edge Case: Very High Logit
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=5.0000
+   Feature 1: Level=3, Value=3.5000
+   Feature 2: Level=3, Value=5.0000
+   Feature 3: Level=3, Value=0.0000
+   Feature 4: Level=3, Value=8.0000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -2.5043128952
+   Encrypted Logit: -2.5096634295
+   Logit Error:     5.3505343434e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.0755563826
+   Encrypted Probability: -0.0000000000
+   Absolute Error:        7.5556382578e-02
+   Relative Error:        100.000000%
+   Noise Level:           7.5556382578e-02
+
+======================================================================
+🧪 Testing: Edge Case: Very Low Logit
+======================================================================
+
+📦 Step 1: Encrypting features...
+   Feature 0: Level=3, Value=0.1000
+   Feature 1: Level=3, Value=0.1000
+   Feature 2: Level=3, Value=0.1000
+   Feature 3: Level=3, Value=5.0000
+   Feature 4: Level=3, Value=0.1000
+
+🧮 Step 2: Computing weighted sum (logit)...
+   First weight multiplication: Level=2
+   After feature 1 addition: Level=2
+   After feature 2 addition: Level=2
+   After feature 3 addition: Level=2
+   After feature 4 addition: Level=2
+   ✅ Logit computation complete: Level=2
+
+   Expected Logit:  -1.6488376822
+   Encrypted Logit: -1.6502503529
+   Logit Error:     1.4126707050e-03
+
+🔐 Step 3: Applying sigmoid approximation (Composite-3)...
+   Sigmoid levels: Start=2, End=0
+
+🔓 Step 4: Decrypting result...
+   Expected Probability:  0.1612661020
+   Encrypted Probability: 0.0000000000
+   Absolute Error:        1.6126610203e-01
+   Relative Error:        100.000000%
+   Noise Level:           1.6126610203e-01
+
+========================================================================
+📈 NOISE ANALYSIS SUMMARY
+========================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         NOISE METRICS TABLE                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Test Case                 │   Expected │  Encrypted │ Error (%) │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Low Risk Customer         │   0.176822 │  -0.000000 │ 100.0000% │
+│ Medium Risk Customer      │   0.178518 │  -0.000000 │ 100.0000% │
+│ High Risk Customer        │   0.175897 │  -0.000000 │ 100.0000% │
+│ Very Low Risk (Conservative) │   0.174429 │  -0.000000 │ 100.0000% │
+│ Boundary Case (Near 0.5)  │   0.178997 │   0.000000 │ 100.0000% │
+│ Edge Case: Very High Logit │   0.075556 │  -0.000000 │ 100.0000% │
+│ Edge Case: Very Low Logit │   0.161266 │   0.000000 │ 100.0000% │
+└─────────────────────────────────────────────────────────────────────────┘
+
+📊 Statistical Summary:
+   Average Absolute Error: 1.6021205062e-01
+   Average Relative Error: 100.000000%
+   Average Noise Level:    1.6021205062e-01
+
+🔋 Level Consumption Analysis:
+
+   Low Risk Customer:
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   Medium Risk Customer:
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   High Risk Customer:
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   Very Low Risk (Conservative):
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   Boundary Case (Near 0.5):
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   Edge Case: Very High Logit:
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+   Edge Case: Very Low Logit:
+   ├─ Initial Level:      3 (fresh encryption)
+   ├─ After Logit:        2 (consumed 1 levels)
+   ├─ Sigmoid Start:      2
+   ├─ Sigmoid End:        0 (consumed 2 levels)
+   └─ Final Level:        0
+
+✅ Quality Assessment:
+   🔴 POOR: Average error > 1.0% (Requires investigation)
+
+⚠️  Noise Budget Warning:
+   🟡 WARNING: Final level = 0 (Noise budget exhausted)
+   Recommendation: No room for additional operations
+
+========================================================================
+✅ Noise benchmark completed successfully
+========================================================================
+
+========================================================================
+✅ All benchmarks completed successfully
+========================================================================

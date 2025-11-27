@@ -1,0 +1,107 @@
+╔══════════════════════════════════════════════════════════════╗
+║   CKKS Noise Evaluation Benchmark                           ║
+╚══════════════════════════════════════════════════════════════╝
+
+================================================================================
+CKKS Noise Evaluation Benchmark
+================================================================================
+
+🧪 Testing 10 scenarios...
+
+[1/10] Low Risk Profile
+  Features: age=2, loan_to_income=0.20, debt_to_income=20.00, credit_amount=1, income=5
+  Description: Young (25), low debt (20%), loan_ratio 0.2, income 500k
+  📊 Expected: 0.141875
+  📊 Actual:   0.000000
+  📉 Noise:    0.1418746344 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[2/10] Medium Risk Profile
+  Features: age=4, loan_to_income=0.40, debt_to_income=40.00, credit_amount=2, income=4
+  Description: Middle-aged (40), moderate debt (40%), loan_ratio 0.4, income 350k
+  📊 Expected: 0.123977
+  📊 Actual:   -0.000000
+  📉 Noise:    0.1239768334 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[3/10] High Risk Profile
+  Features: age=6, loan_to_income=0.80, debt_to_income=70.00, credit_amount=3, income=2
+  Description: Older (55), high debt (70%), loan_ratio 0.8, low income 200k
+  📊 Expected: 0.116415
+  📊 Actual:   0.000000
+  📉 Noise:    0.1164152895 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[4/10] Edge Case: Very Low Income
+  Features: age=3, loan_to_income=5.00, debt_to_income=80.00, credit_amount=1, income=0
+  Description: Age 30, very high loan_ratio (5.0), debt 80%, income only 50k
+  📊 Expected: 0.241589
+  📊 Actual:   -0.000000
+  📉 Noise:    0.2415890294 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[5/10] Edge Case: Minimal Loan
+  Features: age=2, loan_to_income=0.01, debt_to_income=5.00, credit_amount=0, income=8
+  Description: Very young (22), minimal debt (5%), tiny loan_ratio 0.01, high income 800k
+  📊 Expected: 0.135178
+  📊 Actual:   0.000000
+  📉 Noise:    0.1351776218 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[6/10] Edge Case: Maximum Risk
+  Features: age=8, loan_to_income=2.00, debt_to_income=100.00, credit_amount=5, income=1
+  Description: Elderly (75), maxed debt (100%), extreme loan_ratio (2.0), low income 100k
+  📊 Expected: 0.097031
+  📊 Actual:   0.000000
+  📉 Noise:    0.0970305451 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[7/10] Average Profile
+  Features: age=4, loan_to_income=0.30, debt_to_income=35.00, credit_amount=1, income=4
+  Description: Average: age 35, debt 35%, loan_ratio 0.3, income 400k
+  📊 Expected: 0.132667
+  📊 Actual:   -0.000000
+  📉 Noise:    0.1326666164 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[8/10] Boundary: Near Zero Logit
+  Features: age=4, loan_to_income=0.25, debt_to_income=30.00, credit_amount=1, income=4
+  Description: Logit close to 0: age 44, debt 30%, loan_ratio 0.25, income 450k
+  📊 Expected: 0.103986
+  📊 Actual:   0.000000
+  📉 Noise:    0.1039861778 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[9/10] Stress Test: Best Applicant
+  Features: age=2, loan_to_income=0.00, debt_to_income=0.00, credit_amount=0, income=10
+  Description: Best: youngest (18), no debt (0%), no loan, very high income 1M
+  📊 Expected: 0.139141
+  📊 Actual:   0.000000
+  📉 Noise:    0.1391407681 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+[10/10] Stress Test: Worst Applicant
+  Features: age=8, loan_to_income=10.00, debt_to_income=100.00, credit_amount=10, income=0
+  Description: Worst: elderly (80), extreme debt (100%), max loan_ratio (10), very low income 50k
+  📊 Expected: 0.078522
+  📊 Actual:   0.000000
+  📉 Noise:    0.0785217614 (100.000000%)
+  ⚠️  WARNING: High noise detected!
+
+================================================================================
+Noise Statistics Summary
+================================================================================
+Mean Noise:          0.1310379277
+Median Noise:        0.1326666164
+Std Deviation:       0.0416345453
+Min Noise:           0.0785217614
+Max Noise:           0.2415890294
+95th Percentile:     0.2415890294
+99th Percentile:     0.2415890294
+Max Relative Error:  100.000000%
+================================================================================
+
+✅ Production Readiness Assessment:
+   🔴 POOR: Mean noise > 1% - Requires optimization
+   🔴 WARNING: Max noise > 5% - Review edge cases
+

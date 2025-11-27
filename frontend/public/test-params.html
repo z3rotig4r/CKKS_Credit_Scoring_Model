@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Parameters Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #252526;
+            border-left: 3px solid #007acc;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        button {
+            padding: 10px 20px;
+            background: #007acc;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #005a9e; }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 CKKS WASM Parameters Test</h1>
+    
+    <div class="section">
+        <h2>Step 1: Load WASM</h2>
+        <button onclick="loadWasm()">Load WASM Module</button>
+        <div id="wasm-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 2: Check Parameters</h2>
+        <button onclick="checkParams()">Get Parameters</button>
+        <div id="params-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 3: Generate Keys</h2>
+        <button onclick="generateKeys()">Generate Keys</button>
+        <div id="keys-status"></div>
+    </div>
+
+    <div class="section">
+        <h2>Step 4: Test Encryption/Decryption</h2>
+        <input type="number" id="test-value" value="0.5" step="0.1" style="padding: 8px; font-size: 16px;">
+        <button onclick="testEncryptDecrypt()">Test Encrypt/Decrypt</button>
+        <div id="test-status"></div>
+    </div>
+
+    <script src="/wasm_exec.js"></script>
+    <script>
+        let go, wasmInstance;
+        let secretKey, publicKey;
+
+        async function loadWasm() {
+            const statusDiv = document.getElementById('wasm-status');
+            statusDiv.innerHTML = '<p class="warning">⏳ Loading WASM...</p>';
+            
+            try {
+                // Force fresh load
+                const cacheBuster = Date.now();
+                const response = await fetch(`/main.wasm?v=${cacheBuster}`, { cache: 'no-store' });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const wasmBytes = await response.arrayBuffer();
+                statusDiv.innerHTML += `<p>📦 WASM size: ${(wasmBytes.byteLength / 1024 / 1024).toFixed(2)} MB</p>`;
+                
+                go = new Go();
+                const result = await WebAssembly.instantiate(wasmBytes, go.importObject);
+                wasmInstance = result.instance;
+                
+                // Run WASM
+                go.run(wasmInstance);
+                
+                // Wait for functions
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const functions = ['fheKeygen', 'fheEncrypt', 'fheDecrypt', 'fheGetParamsInfo'];
+                const available = functions.filter(fn => typeof window[fn] === 'function');
+                
+                if (available.length === functions.length) {
+                    statusDiv.innerHTML += `<p class="success">✅ WASM loaded successfully!</p>`;
+                    statusDiv.innerHTML += `<p class="success">✅ All FHE functions available: ${available.join(', ')}</p>`;
+                } else {
+                    const missing = functions.filter(fn => typeof window[fn] !== 'function');
+                    statusDiv.innerHTML += `<p class="error">❌ Missing functions: ${missing.join(', ')}</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('WASM load error:', error);
+            }
+        }
+
+        async function checkParams() {
+            const statusDiv = document.getElementById('params-status');
+            statusDiv.innerHTML = '<p class="warning">⏳ Checking parameters...</p>';
+            
+            try {
+                if (typeof window.fheGetParamsInfo !== 'function') {
+                    throw new Error('fheGetParamsInfo not available. Load WASM first.');
+                }
+                
+                const paramsJson = window.fheGetParamsInfo();
+                const params = JSON.parse(paramsJson);
+                
+                statusDiv.innerHTML = '<p class="success">✅ Parameters retrieved:</p>';
+                statusDiv.innerHTML += '<pre>' + JSON.stringify(params, null, 2) + '</pre>';
+                
+                // Check MaxLevel
+                if (params.MaxLevel === 5) {
+                    statusDiv.innerHTML += '<p class="success">✅ MaxLevel = 5 (Correct!)</p>';
+                } else {
+                    statusDiv.innerHTML += `<p class="error">❌ MaxLevel = ${params.MaxLevel} (Expected 5)</p>`;
+                    statusDiv.innerHTML += '<p class="error">⚠️ CRITICAL: WASM is using old parameters!</p>';
+                    statusDiv.innerHTML += '<p class="error">Solution: Hard refresh (Ctrl+Shift+R) or clear browser cache</p>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Params check error:', error);
+            }
+        }
+
+        async function generateKeys() {
+            const statusDiv = document.getElementById('keys-status');
+            statusDiv.innerHTML = '<p class="warning">⏳ Generating keys...</p>';
+            
+            try {
+                if (typeof window.fheKeygen !== 'function') {
+                    throw new Error('fheKeygen not available. Load WASM first.');
+                }
+                
+                const startTime = performance.now();
+                const keyPair = await window.fheKeygen();
+                const endTime = performance.now();
+                
+                secretKey = keyPair.secretKey;
+                publicKey = keyPair.publicKey;
+                
+                statusDiv.innerHTML = '<p class="success">✅ Keys generated!</p>';
+                statusDiv.innerHTML += `<p>⏱️ Time: ${(endTime - startTime).toFixed(2)} ms</p>`;
+                statusDiv.innerHTML += `<p>🔑 Secret Key size: ${secretKey.length} bytes</p>`;
+                statusDiv.innerHTML += `<p>🔓 Public Key size: ${publicKey.length} bytes</p>`;
+            } catch (error) {
+                statusDiv.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Keygen error:', error);
+            }
+        }
+
+        async function testEncryptDecrypt() {
+            const statusDiv = document.getElementById('test-status');
+            const value = parseFloat(document.getElementById('test-value').value);
+            
+            statusDiv.innerHTML = `<p class="warning">⏳ Testing with value: ${value}</p>`;
+            
+            try {
+                if (!publicKey || !secretKey) {
+                    throw new Error('Keys not generated. Generate keys first.');
+                }
+                
+                // Encrypt
+                const encStartTime = performance.now();
+                const ciphertext = await window.fheEncrypt(publicKey, value);
+                const encEndTime = performance.now();
+                
+                statusDiv.innerHTML += `<p>📤 Encrypted in ${(encEndTime - encStartTime).toFixed(2)} ms</p>`;
+                statusDiv.innerHTML += `<p>📦 Ciphertext size: ${ciphertext.length} bytes</p>`;
+                
+                // Decrypt
+                const decStartTime = performance.now();
+                const decrypted = await window.fheDecrypt(secretKey, ciphertext);
+                const decEndTime = performance.now();
+                
+                statusDiv.innerHTML += `<p>📥 Decrypted in ${(decEndTime - decStartTime).toFixed(2)} ms</p>`;
+                statusDiv.innerHTML += `<p>🔢 Original: ${value}</p>`;
+                statusDiv.innerHTML += `<p>🔢 Decrypted: ${decrypted}</p>`;
+                
+                const error = Math.abs(decrypted - value);
+                const relError = (error / value) * 100;
+                
+                if (error < 0.001) {
+                    statusDiv.innerHTML += `<p class="success">✅ Error: ${error.toFixed(6)} (${relError.toFixed(3)}%)</p>`;
+                } else if (error < 0.01) {
+                    statusDiv.innerHTML += `<p class="warning">⚠️ Error: ${error.toFixed(6)} (${relError.toFixed(3)}%)</p>`;
+                } else {
+                    statusDiv.innerHTML += `<p class="error">❌ Error too large: ${error.toFixed(6)} (${relError.toFixed(3)}%)</p>`;
+                    statusDiv.innerHTML += `<p class="error">This indicates a parameter mismatch or noise budget issue!</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+
+        // Auto-load on page load
+        window.addEventListener('load', () => {
+            console.log('🔬 WASM Test Page Loaded');
+            console.log('Click "Load WASM Module" to begin');
+        });
+    </script>
+</body>
+</html>

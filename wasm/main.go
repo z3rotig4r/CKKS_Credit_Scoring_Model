@@ -14,11 +14,12 @@ var (
 )
 
 func init() {
-	// CKKS 파라미터 초기화 (LogN=14, LogSlots=13, Scale=2^40, LogQ=[60,40,40,60])
+	// CKKS 파라미터 초기화 (LogN=13, LogSlots=12, Scale=2^40, LogQ=[60,40,40,40,40,60])
+	// MaxLevel=5 to provide sufficient depth for sigmoid evaluation
 	var err error
 	params, err = ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
-		LogN:            14,
-		LogQ:            []int{60, 40, 40, 60},
+		LogN:            13,
+		LogQ:            []int{60, 40, 40, 40, 40, 60},
 		LogP:            []int{61},
 		LogDefaultScale: 40,
 	})
@@ -606,6 +607,97 @@ func decryptWrapper(this js.Value, args []js.Value) interface{} {
 	return promiseConstructor.New(handler)
 }
 
+// encryptVectorWrapper: 벡터 (여러 값) 한번에 암호화 - SIMD packing
+func encryptVectorWrapper(this js.Value, args []js.Value) interface{} {
+	if len(args) != 2 {
+		return js.Global().Get("Error").New("encryptVector requires 2 arguments: publicKey (Uint8Array), values (Array of numbers)")
+	}
+
+	pkArray := args[0]
+	valuesJS := args[1]
+
+	handler := js.FuncOf(func(this js.Value, promiseArgs []js.Value) interface{} {
+		resolve := promiseArgs[0]
+		reject := promiseArgs[1]
+
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					errorConstructor := js.Global().Get("Error")
+					errorObject := errorConstructor.New(fmt.Sprintf("EncryptVector failed: %v", r))
+					reject.Invoke(errorObject)
+				}
+			}()
+
+			// Public Key 역직렬화
+			pkBytes := make([]byte, pkArray.Get("length").Int())
+			js.CopyBytesToGo(pkBytes, pkArray)
+
+			pk := &rlwe.PublicKey{}
+			if err := pk.UnmarshalBinary(pkBytes); err != nil {
+				errorConstructor := js.Global().Get("Error")
+				errorObject := errorConstructor.New(fmt.Sprintf("Failed to unmarshal public key: %v", err))
+				reject.Invoke(errorObject)
+				return
+			}
+
+			// JavaScript array를 Go slice로 변환
+			length := valuesJS.Length()
+			if length > params.MaxSlots() {
+				errorConstructor := js.Global().Get("Error")
+				errorObject := errorConstructor.New(fmt.Sprintf("Vector size %d exceeds MaxSlots %d", length, params.MaxSlots()))
+				reject.Invoke(errorObject)
+				return
+			}
+
+			values := make([]complex128, params.MaxSlots())
+			for i := 0; i < length; i++ {
+				values[i] = complex(valuesJS.Index(i).Float(), 0)
+			}
+
+			// 평문 인코딩
+			encoder := ckks.NewEncoder(params)
+			pt := ckks.NewPlaintext(params, params.MaxLevel())
+			if err := encoder.Encode(values, pt); err != nil {
+				errorConstructor := js.Global().Get("Error")
+				errorObject := errorConstructor.New(fmt.Sprintf("Failed to encode plaintext vector: %v", err))
+				reject.Invoke(errorObject)
+				return
+			}
+
+			// 암호화
+			encryptor := ckks.NewEncryptor(params, pk)
+			ct, err := encryptor.EncryptNew(pt)
+			if err != nil {
+				errorConstructor := js.Global().Get("Error")
+				errorObject := errorConstructor.New(fmt.Sprintf("Failed to encrypt vector: %v", err))
+				reject.Invoke(errorObject)
+				return
+			}
+
+			// 직렬화
+			ctBytes, err := ct.MarshalBinary()
+			if err != nil {
+				errorConstructor := js.Global().Get("Error")
+				errorObject := errorConstructor.New(fmt.Sprintf("Failed to marshal ciphertext: %v", err))
+				reject.Invoke(errorObject)
+				return
+			}
+
+			// JavaScript Uint8Array로 변환
+			ctArray := js.Global().Get("Uint8Array").New(len(ctBytes))
+			js.CopyBytesToJS(ctArray, ctBytes)
+
+			resolve.Invoke(ctArray)
+		}()
+
+		return nil
+	})
+
+	promiseConstructor := js.Global().Get("Promise")
+	return promiseConstructor.New(handler)
+}
+
 // getParamsInfo: 파라미터 정보 반환
 func getParamsInfo(this js.Value, args []js.Value) interface{} {
 	info := map[string]interface{}{
@@ -634,6 +726,7 @@ func main() {
 	// JavaScript 전역 객체에 함수 등록
 	js.Global().Set("fheKeygen", js.FuncOf(keygenWrapper))
 	js.Global().Set("fheEncrypt", js.FuncOf(encryptWrapper))
+	js.Global().Set("fheEncryptVector", js.FuncOf(encryptVectorWrapper))
 	js.Global().Set("fheDecrypt", js.FuncOf(decryptWrapper))
 	js.Global().Set("fheGetParamsInfo", js.FuncOf(getParamsInfo))
 
@@ -647,6 +740,7 @@ func main() {
 	fmt.Println("FHE functions exposed to JavaScript:")
 	fmt.Println("  - fheKeygen()")
 	fmt.Println("  - fheEncrypt(publicKey, plaintext)")
+	fmt.Println("  - fheEncryptVector(publicKey, [values])")
 	fmt.Println("  - fheDecrypt(secretKey, ciphertext)")
 	fmt.Println("  - fheGetParamsInfo()")
 	fmt.Println("  - fheGenRelinearizationKey(secretKey)")

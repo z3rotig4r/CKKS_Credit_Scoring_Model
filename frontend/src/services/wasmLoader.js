@@ -44,11 +44,14 @@ class WasmLoader {
 
       this.go = new window.Go();
 
-      // Wasm 모듈 로드
-      const response = await fetch('/main.wasm');
+      // Wasm 모듈 로드 (with cache busting)
+      const cacheBuster = Date.now();
+      const response = await fetch(`/main.wasm?v=${cacheBuster}`, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Failed to fetch main.wasm: ${response.status} ${response.statusText}`);
       }
+      
+      console.log(`🔄 Loading WASM with cache buster: ${cacheBuster}`);
 
       const wasmBytes = await response.arrayBuffer();
       const result = await WebAssembly.instantiate(wasmBytes, this.go.importObject);
@@ -87,6 +90,17 @@ class WasmLoader {
       if (typeof window.fheGetParamsInfo === 'function') {
         const paramsInfo = JSON.parse(window.fheGetParamsInfo());
         console.log('📊 CKKS Parameters:', paramsInfo);
+        
+        // Check if MaxLevel changed - if so, warn user to regenerate keys
+        if (paramsInfo.MaxLevel !== undefined) {
+          const expectedMaxLevel = 5;
+          if (paramsInfo.MaxLevel !== expectedMaxLevel) {
+            console.warn(`⚠️ MaxLevel mismatch: Expected ${expectedMaxLevel}, Got ${paramsInfo.MaxLevel}`);
+            console.warn('🔑 You may need to regenerate keys!');
+          } else {
+            console.log(`✅ MaxLevel correct: ${paramsInfo.MaxLevel}`);
+          }
+        }
       }
 
       return true;
@@ -143,7 +157,17 @@ class WasmLoader {
     }
 
     try {
-      return await window[functionName](...args);
+      const startTime = performance.now();
+      const result = await window[functionName](...args);
+      const endTime = performance.now();
+      const elapsed = endTime - startTime;
+      
+      // Only log if it takes more than 10ms to avoid log spam
+      if (elapsed > 10 || functionName === 'fheEncrypt') {
+        console.log(`⏱️ WASM ${functionName}: ${elapsed.toFixed(2)}ms`);
+      }
+      
+      return result;
     } catch (error) {
       console.error(`Error calling ${functionName}:`, error);
       throw error;
