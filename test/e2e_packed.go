@@ -76,6 +76,7 @@ var testCases = []TestCase{
 type PackedInferenceRequest struct {
 	EncryptedVector    string `json:"encryptedVector"`
 	RelinearizationKey string `json:"relinearizationKey"`
+	GaloisKey          string `json:"galoisKey"`
 }
 
 type InferenceResponse struct {
@@ -87,9 +88,9 @@ func main() {
 	fmt.Println("🧪 CKKS Credit Scoring E2E Test - PACKED CIPHERTEXT")
 	fmt.Println("====================================================\n")
 
-	// Initialize CKKS parameters
+	// Initialize CKKS parameters (must match backend)
 	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
-		LogN:            14,
+		LogN:            13,
 		LogQ:            []int{60, 40, 40, 40, 40, 60},
 		LogP:            []int{61},
 		LogDefaultScale: 40,
@@ -109,8 +110,8 @@ func main() {
 	pk := kgen.GenPublicKeyNew(sk)
 	rlk := kgen.GenRelinearizationKeyNew(sk)
 
-	// Generate rotation keys for rotations 1, 2, 4 (enough for 5 features)
-	rotations := []int{1, 2, 4}
+	// Generate rotation keys for rotations 1, 2, 3, 4 (for summing 5 features)
+	rotations := []int{1, 2, 3, 4}
 	galEls := make([]uint64, len(rotations))
 	for i, rot := range rotations {
 		galEls[i] = params.GaloisElement(rot)
@@ -125,13 +126,33 @@ func main() {
 	encryptor := ckks.NewEncryptor(params, pk)
 	decryptor := ckks.NewDecryptor(params, sk)
 
-	// Serialize RLK for backend
+	// Serialize RLK and Galois keys for backend
 	rlkBytes, err := rlk.MarshalBinary()
 	if err != nil {
 		panic(fmt.Sprintf("Failed to serialize RLK: %v", err))
 	}
 	rlkBase64 := base64.StdEncoding.EncodeToString(rlkBytes)
-	fmt.Printf("📦 Relinearization key serialized: %.2f MB\n\n", float64(len(rlkBytes))/1024.0/1024.0)
+
+	// Serialize Galois keys - combine all keys into one buffer
+	var gkBuffer bytes.Buffer
+	for i, gk := range galKeys {
+		gkBytes, err := gk.MarshalBinary()
+		if err != nil {
+			panic(fmt.Sprintf("Failed to serialize Galois key %d: %v", i, err))
+		}
+		// Write length prefix (4 bytes) + key data
+		lenBytes := make([]byte, 4)
+		lenBytes[0] = byte(len(gkBytes) >> 24)
+		lenBytes[1] = byte(len(gkBytes) >> 16)
+		lenBytes[2] = byte(len(gkBytes) >> 8)
+		lenBytes[3] = byte(len(gkBytes))
+		gkBuffer.Write(lenBytes)
+		gkBuffer.Write(gkBytes)
+	}
+	gkBase64 := base64.StdEncoding.EncodeToString(gkBuffer.Bytes())
+
+	fmt.Printf("📦 Relinearization key serialized: %.2f MB\n", float64(len(rlkBytes))/1024.0/1024.0)
+	fmt.Printf("📦 Galois keys serialized: %.2f MB (rotations: %v)\n\n", float64(gkBuffer.Len())/1024.0/1024.0, rotations)
 
 	// Run test cases
 	passCount := 0
@@ -194,6 +215,7 @@ func main() {
 		reqBody := PackedInferenceRequest{
 			EncryptedVector:    encryptedVector,
 			RelinearizationKey: rlkBase64,
+			GaloisKey:          gkBase64,
 		}
 		reqJSON, _ := json.Marshal(reqBody)
 		requestSize := len(reqJSON)

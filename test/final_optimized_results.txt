@@ -1,0 +1,139 @@
+🧪 CKKS Credit Scoring E2E Test
+================================
+
+📊 CKKS Parameters: LogN=13, MaxLevel=5, MaxSlots=4096
+
+🔑 Generating keys...
+✅ Keys generated in 27.29ms
+
+📦 Relinearization key serialized: 5506000 bytes
+
+Test 1/5: Good Credit - High Income
+------------------------------------------------------------
+🔒 Encrypting features...
+  Feature 1: 0.5000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 2: 0.7500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 3: 0.3000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 4: 0.8500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 5: 0.2000 → 786807 bytes (768.37 KB, Level=5)
+✅ Encryption completed in 29.48ms (Total: 3841.83 KB)
+
+📡 Sending to backend...
+✅ Backend inference completed in 140.04ms (Request: 12291.78 KB)
+
+🔓 Decrypting result...
+✅ Decryption completed in 3.79ms (Response: 384.33 KB)
+
+📊 Results:
+  Raw Score: 113155.510340
+  Probability: 11315551.03%
+  Credit Rating: Excellent
+  Expected: Good
+  Total E2E Time: 173.31ms
+  Total Network: 12676.10 KB
+❌ FAIL - Score 113155.510340 out of range!
+
+Test 2/5: Poor Credit - Low Income
+------------------------------------------------------------
+🔒 Encrypting features...
+  Feature 1: 0.3000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 2: 0.2000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 3: 0.6000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 4: 0.3000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 5: 0.8000 → 786807 bytes (768.37 KB, Level=5)
+✅ Encryption completed in 34.45ms (Total: 3841.83 KB)
+
+📡 Sending to backend...
+✅ Backend inference completed in 96.99ms (Request: 12291.78 KB)
+
+🔓 Decrypting result...
+✅ Decryption completed in 3.26ms (Response: 384.33 KB)
+
+📊 Results:
+  Raw Score: -43068.858138
+  Probability: -4306885.81%
+  Credit Rating: Poor
+  Expected: Poor
+  Total E2E Time: 134.70ms
+  Total Network: 12676.10 KB
+❌ FAIL - Score -43068.858138 out of range!
+
+Test 3/5: Excellent Credit - High Income Low Debt
+------------------------------------------------------------
+🔒 Encrypting features...
+  Feature 1: 0.6000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 2: 0.9500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 3: 0.2000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 4: 0.9500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 5: 0.1000 → 786807 bytes (768.37 KB, Level=5)
+✅ Encryption completed in 27.01ms (Total: 3841.83 KB)
+
+📡 Sending to backend...
+✅ Backend inference completed in 106.17ms (Request: 12291.78 KB)
+
+🔓 Decrypting result...
+✅ Decryption completed in 3.35ms (Response: 384.33 KB)
+
+📊 Results:
+  Raw Score: -218338.754214
+  Probability: -21833875.42%
+  Credit Rating: Poor
+  Expected: Excellent
+  Total E2E Time: 136.53ms
+  Total Network: 12676.10 KB
+❌ FAIL - Score -218338.754214 out of range!
+
+Test 4/5: Average Credit - Middle Income
+------------------------------------------------------------
+🔒 Encrypting features...
+  Feature 1: 0.4000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 2: 0.5000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 3: 0.4000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 4: 0.6000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 5: 0.4000 → 786807 bytes (768.37 KB, Level=5)
+✅ Encryption completed in 26.24ms (Total: 3841.83 KB)
+
+📡 Sending to backend...
+✅ Backend inference completed in 91.90ms (Request: 12291.78 KB)
+
+🔓 Decrypting result...
+✅ Decryption completed in 3.10ms (Response: 384.33 KB)
+
+📊 Results:
+  Raw Score: -44489.157564
+  Probability: -4448915.76%
+  Credit Rating: Poor
+  Expected: Fair
+  Total E2E Time: 121.24ms
+  Total Network: 12676.10 KB
+❌ FAIL - Score -44489.157564 out of range!
+
+Test 5/5: Young Professional - Low History
+------------------------------------------------------------
+🔒 Encrypting features...
+  Feature 1: 0.1500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 2: 0.6000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 3: 0.5000 → 786807 bytes (768.37 KB, Level=5)
+  Feature 4: 0.5500 → 786807 bytes (768.37 KB, Level=5)
+  Feature 5: 0.3500 → 786807 bytes (768.37 KB, Level=5)
+✅ Encryption completed in 27.91ms (Total: 3841.83 KB)
+
+📡 Sending to backend...
+✅ Backend inference completed in 98.76ms (Request: 12291.78 KB)
+
+🔓 Decrypting result...
+✅ Decryption completed in 3.07ms (Response: 384.33 KB)
+
+📊 Results:
+  Raw Score: -148133.994306
+  Probability: -14813399.43%
+  Credit Rating: Poor
+  Expected: Fair
+  Total E2E Time: 129.74ms
+  Total Network: 12676.10 KB
+❌ FAIL - Score -148133.994306 out of range!
+
+
+============================================================
+🎯 Test Summary: 0/5 passed (0.0%)
+❌ 5 tests failed

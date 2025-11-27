@@ -1,0 +1,133 @@
+🧪 CKKS Credit Scoring E2E Test - PACKED CIPHERTEXT
+====================================================
+
+📊 CKKS Parameters: LogN=13, MaxLevel=5, MaxSlots=4096
+
+🔑 Generating keys (with rotation support)...
+✅ Keys generated in 126.37ms (including rotation keys)
+
+📦 Relinearization key serialized: 5.25 MB
+📦 Galois keys serialized: 21.00 MB (rotations: [1 2 3 4])
+
+Test 1/5: Good Credit - High Income
+------------------------------------------------------------
+🔒 Encrypting feature vector (PACKED)...
+✅ Packed encryption: 5 features → 1 ciphertext
+   Size: 768.37 KB, Level=5, Time: 7.18ms
+
+📡 Sending packed vector to backend...
+✅ Backend (packed) inference: 415.07ms (Request: 36871.01 KB)
+
+🔓 Decrypting result...
+✅ Decryption: 4.37ms (Response: 384.32 KB)
+
+📊 Results:
+  Raw Score: 0.174009
+  Probability: 17.40%
+  Credit Rating: Poor
+  Expected: Good
+  Total E2E Time: 426.62ms
+  Total Network: 37255.33 KB
+✅ PASS - Score in valid range [0, 1]
+
+Test 2/5: Poor Credit - Low Income
+------------------------------------------------------------
+🔒 Encrypting feature vector (PACKED)...
+✅ Packed encryption: 5 features → 1 ciphertext
+   Size: 768.37 KB, Level=5, Time: 7.25ms
+
+📡 Sending packed vector to backend...
+✅ Backend (packed) inference: 342.45ms (Request: 36871.01 KB)
+
+🔓 Decrypting result...
+✅ Decryption: 3.90ms (Response: 384.32 KB)
+
+📊 Results:
+  Raw Score: 0.183542
+  Probability: 18.35%
+  Credit Rating: Poor
+  Expected: Poor
+  Total E2E Time: 353.61ms
+  Total Network: 37255.33 KB
+✅ PASS - Score in valid range [0, 1]
+
+Test 3/5: Excellent Credit - High Income Low Debt
+------------------------------------------------------------
+🔒 Encrypting feature vector (PACKED)...
+✅ Packed encryption: 5 features → 1 ciphertext
+   Size: 768.37 KB, Level=5, Time: 5.96ms
+
+📡 Sending packed vector to backend...
+✅ Backend (packed) inference: 315.50ms (Request: 36871.01 KB)
+
+🔓 Decrypting result...
+✅ Decryption: 3.70ms (Response: 384.32 KB)
+
+📊 Results:
+  Raw Score: 0.168618
+  Probability: 16.86%
+  Credit Rating: Poor
+  Expected: Excellent
+  Total E2E Time: 325.16ms
+  Total Network: 37255.33 KB
+✅ PASS - Score in valid range [0, 1]
+
+Test 4/5: Average Credit - Middle Income
+------------------------------------------------------------
+🔒 Encrypting feature vector (PACKED)...
+✅ Packed encryption: 5 features → 1 ciphertext
+   Size: 768.37 KB, Level=5, Time: 5.71ms
+
+📡 Sending packed vector to backend...
+✅ Backend (packed) inference: 293.01ms (Request: 36871.01 KB)
+
+🔓 Decrypting result...
+✅ Decryption: 3.93ms (Response: 384.32 KB)
+
+📊 Results:
+  Raw Score: 0.179385
+  Probability: 17.94%
+  Credit Rating: Poor
+  Expected: Fair
+  Total E2E Time: 302.64ms
+  Total Network: 37255.33 KB
+✅ PASS - Score in valid range [0, 1]
+
+Test 5/5: Young Professional - Low History
+------------------------------------------------------------
+🔒 Encrypting feature vector (PACKED)...
+✅ Packed encryption: 5 features → 1 ciphertext
+   Size: 768.37 KB, Level=5, Time: 7.53ms
+
+📡 Sending packed vector to backend...
+✅ Backend (packed) inference: 320.13ms (Request: 36871.01 KB)
+
+🔓 Decrypting result...
+✅ Decryption: 3.51ms (Response: 384.32 KB)
+
+📊 Results:
+  Raw Score: 0.188814
+  Probability: 18.88%
+  Credit Rating: Poor
+  Expected: Fair
+  Total E2E Time: 331.17ms
+  Total Network: 37255.33 KB
+✅ PASS - Score in valid range [0, 1]
+
+
+============================================================
+🎯 Test Summary: 5/5 passed (100.0%)
+
+============================================================
+📊 Aggregate Performance Metrics (PACKED OPTIMIZATION)
+============================================================
+Key Generation:     126.37ms
+Avg Encryption:     6.73ms per test (5 features → 1 ciphertext)
+Avg Backend:        337.23ms per test
+Avg Decryption:     3.88ms per test
+Total E2E Time:     347.84ms avg per test
+------------------------------------------------------------
+Avg Ciphertext Size: 768.37 KB per test (1 packed vector)
+Avg Network Traffic: 37255.33 KB per test (upload + download)
+RLK Size:            5.25 MB (sent once per test)
+============================================================
