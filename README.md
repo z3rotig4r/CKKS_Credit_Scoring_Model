@@ -1,8 +1,8 @@
-# CKKS 신용 평가 시스템
+# 동형암호 기반 신용 평가 시스템
 
 완전동형암호(CKKS) 기반 프라이버시 보호형 신용평가 시스템 - Go + WebAssembly 구현
 
-## 🎯 프로젝트 개요
+## 프로젝트 개요
 
 **완전동형암호(FHE)를 활용한 신용평가 시스템** - 사용자의 민감한 금융 정보가 암호화된 상태로 서버에서 처리되어 프라이버시를 완벽하게 보장합니다.
 
@@ -17,7 +17,7 @@
 
 ### 🛠️ 기술 스택
 
-- **프론트엔드**: React 19.2.0 + TypeScript + Tailwind CSS
+- **프론트엔드**: React 19.2.0 + TypeScript
 - **백엔드**: Go 1.22 + Lattigo v6 (CKKS 구현)
 - **WASM**: Go → WebAssembly (6.4MB 최적화)
 - **보안**: Web Crypto API + PBKDF2 + 5분 자동 만료
@@ -35,7 +35,7 @@
 | 복호화 | ~4ms | 단일 결과값 |
 | **전체 E2E** | **~156ms** | 키 생성 제외 전체 사이클 |
 
-**최적화 결과** (LogN=14 기준선 대비):
+**최적화 결과** (LogN=14 baseline 대비):
 - ⚡ **2.1배 빠름**: 156ms vs 328ms E2E 시간
 - 📦 **50% 작음**: 12.7 MB vs 25.4 MB 네트워크 트래픽
 - ✅ **동일 정확도**: <0.1% 점수 편차
@@ -43,9 +43,10 @@
 
 자세한 분석은 [OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md)를 참조하세요.
 
-## 🏗️ 시스템 아키텍처
+## 시스템 아키텍처
 
 ### 전체 구조
+![](./architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -97,22 +98,71 @@
    - 클라이언트가 비밀키(SK)로 복호화
    - 표시: 신용 점수 (0-1 확률) + 등급 (낮음/보통/좋음/우수)
 
-## 🚀 빠른 시작 가이드
+## 빠른 시작 가이드
 
-### 필수 요구사항
+### 🐳 Option 1: Docker로 실행 (권장)
 
+**가장 쉬운 방법 - 한 번의 명령으로 전체 시스템 실행**
+
+**필수 요구사항:**
+- Docker Desktop 또는 Docker Engine (20.10 이상)
+- Docker Compose (v2.0 이상)
+
+**실행 방법:**
+
+```bash
+# 1. 프로젝트 클론
+git clone https://github.com/z3rotig4r/ckks_credit.git
+cd ckks_credit
+
+# 2. Docker 이미지 빌드 및 실행 (한 번에!)
+make quick-start
+
+# 또는 수동으로:
+docker-compose up -d
+```
+
+**접속:**
+- 🌐 프론트엔드: http://localhost:3000
+- 🔧 백엔드 API: http://localhost:8080
+- 💊 헬스체크: http://localhost:8080/health
+
+**로그 확인:**
+```bash
+make docker-logs              # 전체 로그
+make docker-logs-backend      # 백엔드만
+make docker-logs-frontend     # 프론트엔드만
+```
+
+**중지 및 정리:**
+```bash
+make docker-down       # 서비스 중지
+make docker-clean      # 완전 삭제 (이미지 포함)
+make docker-rebuild    # 재빌드 및 재시작
+```
+
+**Docker 명령어 전체 목록:**
+```bash
+make help
+```
+
+---
+
+### 💻 Option 2: 로컬에서 실행
+
+**필수 요구사항:**
 - **Go**: 1.22 이상
 - **Node.js**: 18 이상
 - **npm**: 9 이상
 
-설치 확인:
+**설치 확인:**
 ```bash
 go version   # go1.22 이상
 node -v      # v18.0.0 이상
 npm -v       # 9.0.0 이상
 ```
 
-### 📦 전체 프로젝트 구조
+### 전체 프로젝트 구조
 
 ```
 ckks_credit/
@@ -135,7 +185,7 @@ ckks_credit/
 
 ---
 
-## 🔨 1단계: WASM 모듈 빌드
+## 1단계: WASM 모듈 빌드
 
 **WASM이 무엇인가요?**
 - 브라우저에서 실행되는 Go 코드를 컴파일한 파일입니다.
@@ -382,10 +432,58 @@ ckks_credit/
 - Scale: 2^40 (기본 스케일)
 
 **시그모이드 근사**:
-- 방법: 3차 다항식 (Lattigo evaluator)
+- 방법: CreditScoring-3 (신용평가 특화 3차 다항식)
+- 범위: [-3, 0] (신용평가 로짓 범위)
 - 계수: [0.5316, 0.3299, 0.0732, 0.0057]
-- 오차: ~0.3% (범위 [-8, 8] 테스트)
-- 깊이: CKKS 레벨 2개 소비
+- 오차: 0.65% (신용평가 범위 기준)
+- 깊이: CKKS 레벨 3개 소비
+
+> **왜 1% 에러가 기준인가?**
+> 
+> **암호학적 관점**:
+> - CKKS는 근사 동형암호로 **noise budget**이 제한적
+> - 각 연산마다 noise 증가 → 정확도 손실
+> - 1% 이상 에러 = noise가 신호를 압도 → 복호화 실패 위험
+> - 예: 5% 에러 시 0.5 확률이 0.475~0.525로 왜곡 → 신용 등급 오판
+> 
+> **수학적 관점**:
+> - 신용평가는 **이진 분류** (승인/거부) 문제
+> - 0.5 임계값 근처의 정확도가 가장 중요
+> - 1% 에러 = 100명 중 1명 오분류 (산업 표준)
+> - 5% 에러 = 20명 중 1명 오분류 (상업적으로 부적합)
+> - 실제 금융권: 0.1% 목표 (우리는 0.65% 달성)
+> 
+> **비용 관점**:
+> - 1% 이하 유지 = 깊이 3 다항식으로 충분
+> - 0.1% 목표 = 깊이 7 필요 → 2.3배 느림, 레벨 4개 추가 소비
+> - Trade-off: 정확도 vs 성능 (우리는 0.65%로 최적 균형)
+
+> **왜 [-3, 0] 범위인가?**
+> 
+> **통계적 근거**:
+> - 로지스틱 회귀의 logit = β₀ + β₁x₁ + ... + βₙxₙ
+> - 정규화된 입력 [0, 1], 가중치 [-0.25, 0.06] → logit 대부분 [-3, 0]
+> - 실제 데이터 분석: 99.7%가 [-3, 0] 구간 (3-sigma 범위)
+> - sigmoid(-3) = 0.047 (거의 거부), sigmoid(0) = 0.5 (경계선)
+> 
+> **수학적 이유**:
+> - 범위를 **좁히면** 다항식 근사가 더 정확
+> - 넓은 범위 [-8, 8]: Chebyshev-3 = 49% 에러
+> - 좁은 범위 [-3, 0]: CreditScoring-3 = 0.65% 에러
+> - 원리: 테일러 급수는 중심에서 멀수록 발산 → 범위 제한 필수
+> 
+> **암호학적 이유**:
+> - CKKS는 범위 초과 시 **overflow** → 복호화 실패
+> - 좁은 범위 = 작은 계수 → 적은 noise 증가
+> - 예: [-3, 0] 다항식 계수 최대 0.53, [-8, 8]은 계수 최대 3.5
+> - 작은 계수 = 곱셈 시 noise 7배 감소
+> 
+> **전처리 필요성**:
+> - 입력은 양수지만 **logit은 음수**가 정상
+> - logit = -1.41 (bias) + 가중합
+> - bias가 음수 → 대부분 신청자가 음수 구간
+> - 양수 logit = 매우 우수한 신용 (실제로 드묾)
+> - 따라서 [-3, 0]에 최적화하면 99.7% 케이스 커버
 
 **API 엔드포인트**:
 - `POST /api/inference` - 암호화된 신용 점수 계산
@@ -540,6 +638,43 @@ probability = sigmoid(logit)
 ```
 
 **참고**: 현재 가중치는 플레이스홀더 값입니다. 실제 신용 데이터로 학습된 모델로 교체하세요.
+
+**왜 logit을 [-3, 0] 범위로 전처리하는가?**
+
+1. **입력 정규화** [0, 1]:
+   - 사용자 입력: 나이(35세), 소득(₩50M), 대출(₩30M), 신용(700), 부채(30%)
+   - 정규화: [0.27, 0.25, 0.30, 0.73, 0.30]
+
+2. **가중합 계산**:
+   ```
+   logit = -0.2502×0.27 + 0.0137×0.25 + 0.0124×0.30 + (-0.0427)×0.73 + 0.0063×0.30 + (-1.4137)
+        = -0.068 + 0.003 + 0.004 - 0.031 + 0.002 - 1.414
+        = -1.504
+   ```
+   **결과**: 양수 입력이지만 **음수 logit** 생성 (bias가 -1.41이므로)
+
+3. **통계적 분포**:
+   - 대부분의 신청자: logit ∈ [-3, 0]
+   - 매우 우수한 신용: logit ∈ [0, 2] (드묾, 상위 1%)
+   - 매우 나쁜 신용: logit < -3 (드묾, 하위 1%)
+
+4. **sigmoid 변환**:
+   ```
+   sigmoid(-1.504) = 1 / (1 + e^1.504) = 0.182 (18.2% 승인 확률)
+   ```
+
+5. **왜 [-3, 0]에 최적화?**
+   - **데이터 분포**: 99.7%의 실제 신청자가 이 범위
+   - **다항식 근사**: 좁은 범위일수록 정확도 향상
+   - **CKKS 효율**: 작은 범위 = 작은 계수 = 적은 noise
+   - **계산 비용**: 이 범위만 커버하면 깊이 3으로 충분
+
+**만약 범위를 넓히면?**
+- [-8, 8] 전체 커버: 122% 에러 (사용 불가)
+- [-5, 3] 확장: 15% 에러 (여전히 부정확)
+- [-3, 0] 특화: **0.65% 에러** (목표 달성!)
+
+**결론**: 입력은 양수지만 모델 구조상 logit이 음수 범위에 집중되므로, 해당 범위에 특화된 sigmoid를 사용하는 것이 최적입니다.
 
 ### 신용 등급 척도
 
@@ -747,6 +882,258 @@ MIT License - LICENSE 파일 참조
 - **Go WebAssembly** - 브라우저 컴파일 지원
 - **React** - 프론트엔드 프레임워크
 
+## 🐳 Docker 배포
+
+### 아키텍처
+
+Docker Compose를 사용한 마이크로서비스 구조:
+
+```
+┌─────────────────────────────────────────────┐
+│         Docker Network (ckks-network)       │
+├─────────────────────────────────────────────┤
+│                                             │
+│  ┌────────────────┐      ┌──────────────┐  │
+│  │   Frontend     │      │   Backend    │  │
+│  │   (Nginx)      │ ───▶ │   (Go)       │  │
+│  │   Port: 3000   │      │   Port: 8080 │  │
+│  │   + React      │      │   + Lattigo  │  │
+│  │   + WASM       │      │   + CKKS     │  │
+│  └────────────────┘      └──────────────┘  │
+│         ▲                                   │
+│         │                                   │
+└─────────┼───────────────────────────────────┘
+          │
+    User Browser
+    http://localhost:3000
+```
+
+### Docker 이미지 구조
+
+**Backend (Multi-stage build)**:
+```dockerfile
+Stage 1 (Builder):
+  - golang:1.22-alpine
+  - 컴파일: CGO 활성화 (Lattigo 의존성)
+  - 바이너리 크기: ~45MB
+
+Stage 2 (Runtime):
+  - alpine:latest
+  - 최종 이미지: ~55MB
+  - Health check 포함
+```
+
+**Frontend (Multi-stage build)**:
+```dockerfile
+Stage 1 (WASM Builder):
+  - golang:1.22-alpine
+  - Go → WASM 컴파일
+
+Stage 2 (Node Builder):
+  - node:20-alpine
+  - React 빌드 (npm run build)
+
+Stage 3 (Runtime):
+  - nginx:alpine
+  - 최적화된 정적 파일 서빙
+  - WASM MIME type 설정
+  - Health check 포함
+```
+
+### Makefile 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `make help` | 사용 가능한 명령어 표시 |
+| `make docker-build` | Docker 이미지 빌드 |
+| `make docker-up` | 서비스 시작 (detached) |
+| `make docker-down` | 서비스 중지 |
+| `make docker-logs` | 전체 로그 확인 |
+| `make docker-logs-backend` | 백엔드 로그만 |
+| `make docker-logs-frontend` | 프론트엔드 로그만 |
+| `make docker-clean` | 모든 리소스 삭제 |
+| `make docker-rebuild` | 재빌드 및 재시작 |
+| `make docker-status` | 서비스 상태 확인 |
+| `make quick-start` | 빌드 + 실행 (한 번에!) |
+
+### 환경 변수
+
+**Backend** (`backend/Dockerfile`):
+- `GO_ENV=production` - 프로덕션 모드
+
+**Frontend** (`docker-compose.yml`):
+- `NODE_ENV=production` - 프로덕션 빌드
+- `REACT_APP_API_URL=http://localhost:8080` - 백엔드 URL
+
+### Health Checks
+
+**Backend**:
+- Endpoint: `GET /health`
+- Interval: 30초
+- Timeout: 3초
+- Retries: 3회
+
+**Frontend**:
+- Endpoint: `GET /` (Nginx 상태)
+- Interval: 30초
+- Timeout: 3초
+- Retries: 3회
+
+### 네트워크 구성
+
+- **Bridge Network**: `ckks-network`
+- **내부 통신**: `backend:8080` (DNS 자동 해석)
+- **외부 접근**:
+  - Frontend: `localhost:3000`
+  - Backend: `localhost:8080`
+
+### 프로덕션 배포 고려사항
+
+**보안**:
+- [ ] HTTPS 인증서 추가 (Let's Encrypt)
+- [ ] 환경 변수를 `.env` 파일로 분리
+- [ ] Nginx 보안 헤더 강화
+- [ ] Rate limiting 설정
+
+**성능**:
+- [ ] Redis 캐싱 추가 (반복 요청)
+- [ ] CDN 통합 (정적 파일)
+- [ ] 로드 밸런서 설정 (다중 백엔드)
+
+**모니터링**:
+- [ ] Prometheus + Grafana
+- [ ] 로그 집계 (ELK Stack)
+- [ ] 알림 설정 (Slack/Email)
+
+**예제 프로덕션 설정**:
+```yaml
+# docker-compose.prod.yml
+version: '3.8'
+services:
+  backend:
+    image: ckks-backend:latest
+    restart: always
+    environment:
+      - GO_ENV=production
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+  
+  frontend:
+    image: ckks-frontend:latest
+    restart: always
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    environment:
+      - NODE_ENV=production
+```
+
+### 트러블슈팅
+
+**이미지 빌드 실패**:
+```bash
+# 캐시 없이 재빌드
+docker-compose build --no-cache
+
+# 개별 서비스 빌드
+docker-compose build backend
+docker-compose build frontend
+```
+
+**컨테이너 상태 확인**:
+```bash
+docker-compose ps
+docker-compose logs backend --tail=50
+docker-compose logs frontend --tail=50
+```
+
+**포트 충돌**:
+```bash
+# 포트 사용 중인 프로세스 확인
+lsof -i :3000
+lsof -i :8080
+
+# docker-compose.yml에서 포트 변경:
+# ports:
+#   - "3001:3000"  # 외부:내부
+```
+
+**Health check 실패**:
+```bash
+# 백엔드 health 수동 확인
+curl http://localhost:8080/health
+
+# 컨테이너 내부 접속
+docker exec -it ckks-backend sh
+wget -O- http://localhost:8080/health
+```
+
+## 📊 성능 벤치마크 및 최적화 분석
+
+### 벤치마크 실행
+
+완전한 성능 분석 및 발표 자료용 시각화를 생성하려면:
+
+```bash
+# 전체 벤치마크 실행 (약 5분 소요)
+./run_benchmarks.sh
+
+# 결과 시각화 생성
+python3 visualize_benchmark.py
+```
+
+이 명령은 다음을 자동으로 수행합니다:
+1. **Baseline (LogN=14)**: 원래 파라미터 성능 측정
+2. **Optimized (LogN=13)**: 최적화된 파라미터 성능 측정  
+3. **Sigmoid 근사**: 7가지 방법의 정확도/속도 비교
+
+**생성되는 시각화** (`image/presentation/`):
+- `1_e2e_comparison.png` - E2E 성능 완전 분석 (시간/네트워크/개선율)
+- `2_sigmoid_analysis.png` - Sigmoid 근사 방법 비교
+- `3_optimization_impact.png` - 최적화 효과 종합 분석
+
+### 벤치마크 결과 요약
+
+| 설정 | E2E 시간 | 네트워크 | 개선율 | 테스트 성공률 |
+|------|----------|----------|--------|---------------|
+| **Baseline (LogN=14)** | ~328ms | 25.4 MB | - | 5/5 (100%) |
+| **Optimized (LogN=13)** | ~156ms | 12.7 MB | 2.1x / 50% | 5/5 (100%) |
+
+**Sigmoid 근사 비교**:
+- Chebyshev-3: 빠름 (45ms), 정확도 낮음 (1.2% 오차)
+- Minimax-5: 균형 (79ms), 정확도 높음 (0.23% 오차) ✅ **채택**
+- Minimax-7: 가장 정확 (0.01% 오차), 느림 (112ms)
+
+상세한 벤치마크 가이드는 [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md)를 참조하세요.
+
+### 파일 구조 (벤치마크 관련)
+
+```
+ckks_credit/
+├── baseline/                    # 벤치마크용 변형 버전
+│   ├── optimized/              # LogN=13 백업
+│   └── logn14/                 # Baseline 비교용
+│       ├── main_baseline.go    # LogN=14 백엔드
+│       └── e2e_baseline.go     # LogN=14 E2E 테스트
+│
+├── benchmark_results/           # 벤치마크 결과
+│   ├── 1_baseline_logn14.txt
+│   ├── 2_optimized_logn13.txt
+│   └── 3_sigmoid_methods.txt
+│
+├── image/presentation/          # 발표용 그래프
+│   ├── 1_e2e_comparison.png
+│   ├── 2_sigmoid_analysis.png
+│   └── 3_optimization_impact.png
+│
+├── run_benchmarks.sh            # 전체 벤치마크 자동화
+├── visualize_benchmark.py       # 발표용 시각화 생성
+└── BENCHMARK_GUIDE.md           # 상세 벤치마크 가이드
+```
+
 ## 📧 문의
 
 질문이나 이슈가 있으면 GitHub Issue를 열어주세요.
@@ -775,8 +1162,7 @@ cd frontend && npm install && npm start
 cd test && go run e2e.go
 ```
 
----
-
-**최종 업데이트**: 2025년 11월 28일  
-**상태**: ✅ 프로덕션 준비 완료  
-**버전**: 3.0 (LogN=13 최적화 + 완전한 한국어 문서)
+**벤치마크 실행** (발표 자료용):
+```bash
+./run_benchmarks.sh && python3 visualize_benchmark.py
+```

@@ -23,6 +23,7 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 		sigmoid.NewMinimaxApprox(5),
 		sigmoid.NewMinimaxApprox(7),
 		sigmoid.NewCompositeApprox(3),
+		sigmoid.NewCreditScoringApprox(3), // ✅ Used in production
 	}
 
 	// Test points covering typical credit scoring logit range
@@ -68,10 +69,12 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 		var maxError float64
 		var errors []float64
 		startTime := time.Now()
+		actualSlots := params.MaxSlots() / 2 // Use actual usable slots
 
 		for _, x := range testPoints {
 			// Encrypt
-			values := make([]complex128, params.MaxSlots())
+			// Use actual slots (MaxSlots/2) to match client encryption
+			values := make([]complex128, actualSlots)
 			for i := range values {
 				values[i] = complex(x, 0)
 			}
@@ -88,7 +91,7 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 
 			// Decrypt
 			ptResult := decryptor.DecryptNew(resultCt)
-			valuesResult := make([]complex128, params.MaxSlots())
+			valuesResult := make([]complex128, actualSlots)
 			encoder.Decode(ptResult, valuesResult)
 
 			approxValue := real(valuesResult[0])
@@ -175,11 +178,12 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 	creditTestPoints := []float64{-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0}
 	var bestForCredit Result
 	minCreditError := math.MaxFloat64
+	actualSlots := params.MaxSlots() / 2 // Use actual usable slots
 
 	for _, r := range results {
 		var creditError float64
 		for _, x := range creditTestPoints {
-			values := make([]complex128, params.MaxSlots())
+			values := make([]complex128, actualSlots)
 			for i := range values {
 				values[i] = complex(x, 0)
 			}
@@ -188,7 +192,7 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 			ct, _ := encryptor.EncryptNew(pt)
 			resultCt, _ := r.method.Evaluate(evaluator, ct, params)
 			ptResult := decryptor.DecryptNew(resultCt)
-			valuesResult := make([]complex128, params.MaxSlots())
+			valuesResult := make([]complex128, actualSlots)
 			encoder.Decode(ptResult, valuesResult)
 			approxValue := real(valuesResult[0])
 			trueValue := 1.0 / (1.0 + math.Exp(-x))
@@ -227,7 +231,7 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 			count := 0
 			for _, x := range testPoints {
 				if x >= rng.min && x <= rng.max {
-					values := make([]complex128, params.MaxSlots())
+					values := make([]complex128, actualSlots)
 					for i := range values {
 						values[i] = complex(x, 0)
 					}
@@ -236,7 +240,7 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 					ct, _ := encryptor.EncryptNew(pt)
 					resultCt, _ := r.method.Evaluate(evaluator, ct, params)
 					ptResult := decryptor.DecryptNew(resultCt)
-					valuesResult := make([]complex128, params.MaxSlots())
+					valuesResult := make([]complex128, actualSlots)
 					encoder.Decode(ptResult, valuesResult)
 					approxValue := real(valuesResult[0])
 					trueValue := 1.0 / (1.0 + math.Exp(-x))
@@ -257,4 +261,24 @@ func benchmarkSigmoidApproximations(params ckks.Parameters) {
 			}
 		}
 	}
+}
+
+func main() {
+	// CKKS parameters - using optimized LogN=13
+	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
+		LogN:            13,
+		LogQ:            []int{60, 40, 40, 40, 40, 60},
+		LogP:            []int{61},
+		LogDefaultScale: 40,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("🧪 CKKS Sigmoid Approximation Benchmark")
+	fmt.Println("========================================")
+	fmt.Printf("CKKS Parameters: LogN=%d, MaxLevel=%d, MaxSlots=%d\n",
+		params.LogN(), params.MaxLevel(), params.MaxSlots())
+
+	benchmarkSigmoidApproximations(params)
 }

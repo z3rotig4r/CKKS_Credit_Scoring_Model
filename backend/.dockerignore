@@ -1,0 +1,10 @@
+# Backend .dockerignore
+*.log
+*.txt
+server
+server_*
+cmd/
+test/
+*.md
+.git/
+.gitignore

@@ -89,7 +89,7 @@ func main() {
 
 	// Initialize CKKS parameters (must match backend and WASM)
 	params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
-		LogN:            13,
+		LogN:            13,                            // OPTIMIZED configuration
 		LogQ:            []int{60, 40, 40, 40, 40, 60}, // MaxLevel=5
 		LogP:            []int{61},
 		LogDefaultScale: 40,

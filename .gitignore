@@ -7,7 +7,7 @@ node_modules/
 
 # Build outputs
 frontend/build/
-backend/backend
+backend/server
 backend/backend.log
 
 # IDE

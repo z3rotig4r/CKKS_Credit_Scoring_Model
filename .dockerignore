@@ -1,0 +1,16 @@
+# Root .dockerignore
+.git/
+.gitignore
+*.md
+README.md
+OPTIMIZATION_REPORT.md
+PHASE2_PLAN.md
+*.log
+*.txt
+benchmark_results/
+image/
+node_modules/
+build/
+frontend_backup/
+baseline/
+test/
