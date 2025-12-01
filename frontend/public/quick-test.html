@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Quick Performance Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .result {
+            background: #2a2a2a;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .good { color: #00ff00; }
+        .bad { color: #ff0000; }
+        .warning { color: #ffaa00; }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+        pre {
+            background: #000;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .metric {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡ Quick Performance Test</h1>
+    <p>간단하고 빠른 성능 측정</p>
+    
+    <button onclick="runTest()">▶️ 테스트 실행</button>
+    <button onclick="location.reload()">🔄 새로고침 (캐시 삭제)</button>
+    
+    <div id="result"></div>
+
+    <script src="wasm_exec.js"></script>
+    <script>
+        async function runTest() {
+            const output = document.getElementById('result');
+            output.innerHTML = '<div class="result">⏳ 테스트 실행 중...</div>';
+            
+            const results = {};
+            const log = [];
+            
+            try {
+                // 1. WASM 로딩
+                log.push('📦 WASM 로딩 시작...');
+                const t0 = performance.now();
+                
+                const response = await fetch('main.wasm', { cache: 'no-cache' });
+                const blob = await response.blob();
+                const wasmSize = (blob.size / 1024 / 1024).toFixed(2);
+                results.wasmSize = wasmSize;
+                
+                const t1 = performance.now();
+                results.downloadTime = (t1 - t0).toFixed(2);
+                log.push(`✅ WASM 다운로드: ${results.downloadTime}ms (크기: ${wasmSize}MB)`);
+                
+                const arrayBuffer = await blob.arrayBuffer();
+                const go = new Go();
+                const result = await WebAssembly.instantiate(arrayBuffer, go.importObject);
+                
+                const t2 = performance.now();
+                results.compileTime = (t2 - t1).toFixed(2);
+                log.push(`✅ WASM 컴파일: ${results.compileTime}ms`);
+                
+                go.run(result.instance);
+                
+                // Go 함수 노출 대기
+                await new Promise((resolve) => {
+                    const check = setInterval(() => {
+                        if (window.Go && window.Go.fheKeygen) {
+                            clearInterval(check);
+                            resolve();
+                        }
+                    }, 10);
+                });
+                
+                const t3 = performance.now();
+                results.initTime = (t3 - t2).toFixed(2);
+                log.push(`✅ WASM 초기화: ${results.initTime}ms`);
+                log.push('');
+                
+                // 2. 키 생성
+                log.push('🔑 키 생성 시작...');
+                const t4 = performance.now();
+                const keys = await window.Go.fheKeygen();
+                const t5 = performance.now();
+                results.keygenTime = (t5 - t4).toFixed(2);
+                log.push(`✅ 키 생성 완료: ${results.keygenTime}ms`);
+                log.push('');
+                
+                // 3. RLK 생성
+                log.push('🔐 RLK 생성 시작...');
+                const t6 = performance.now();
+                const rlk = await window.Go.fheGenRelinearizationKey(keys.sk);
+                const t7 = performance.now();
+                results.rlkTime = (t7 - t6).toFixed(2);
+                log.push(`✅ RLK 생성 완료: ${results.rlkTime}ms`);
+                log.push('');
+                
+                // 4. 5개 Feature 암호화 (개별 측정)
+                log.push('🔐 5개 Feature 암호화 시작...');
+                const features = [0.5, 0.6, 0.7, 0.8, 0.9];
+                const encTimes = [];
+                
+                for (let i = 0; i < features.length; i++) {
+                    const tStart = performance.now();
+                    await window.Go.fheEncrypt(keys.pk, features[i]);
+                    const tEnd = performance.now();
+                    const time = (tEnd - tStart).toFixed(2);
+                    encTimes.push(time);
+                    log.push(`  Feature ${i+1}: ${time}ms`);
+                }
+                
+                const totalEncTime = encTimes.reduce((a, b) => parseFloat(a) + parseFloat(b), 0).toFixed(2);
+                const avgEncTime = (totalEncTime / features.length).toFixed(2);
+                results.encTimes = encTimes;
+                results.totalEncTime = totalEncTime;
+                results.avgEncTime = avgEncTime;
+                log.push(`✅ 총 암호화: ${totalEncTime}ms (평균: ${avgEncTime}ms/feature)`);
+                log.push('');
+                
+                // 5. 파라미터 확인
+                const params = await window.Go.fheGetParamsInfo();
+                results.params = params;
+                log.push(`📊 CKKS 파라미터:`);
+                log.push(`  - LogN: ${params.LogN}`);
+                log.push(`  - MaxLevel: ${params.MaxLevel}`);
+                log.push(`  - MaxSlots: ${params.MaxSlots}`);
+                
+                // 결과 표시
+                displayResults(results, log);
+                
+            } catch (error) {
+                output.innerHTML = `<div class="result"><span class="bad">❌ 에러: ${error.message}</span></div>`;
+                console.error(error);
+            }
+        }
+        
+        function displayResults(results, log) {
+            const output = document.getElementById('result');
+            
+            // 성능 평가
+            const avgEnc = parseFloat(results.avgEncTime);
+            const totalEnc = parseFloat(results.totalEncTime);
+            const keygen = parseFloat(results.keygenTime);
+            
+            let status = 'good';
+            let statusText = '✅ 우수함!';
+            let recommendation = '모든 성능 목표 달성!';
+            
+            if (avgEnc > 30) {
+                status = 'bad';
+                statusText = '❌ 매우 느림!';
+                recommendation = '브라우저 캐시를 완전히 삭제하고 재테스트하세요!<br>Ctrl+Shift+Del → "전체 기간" → "캐시된 이미지 및 파일" 체크';
+            } else if (avgEnc > 15) {
+                status = 'warning';
+                statusText = '⚠️ 느림';
+                recommendation = '브라우저를 재시작하거나 시크릿 모드로 테스트하세요.';
+            }
+            
+            output.innerHTML = `
+                <div class="result">
+                    <h2 class="${status}">${statusText}</h2>
+                    <div class="metric ${status}">평균 암호화: ${results.avgEncTime}ms/feature</div>
+                    <div class="metric ${status}">총 암호화 (5개): ${results.totalEncTime}ms</div>
+                    <hr>
+                    <p><strong>목표:</strong> 평균 6-10ms, 총 30-50ms</p>
+                    <p class="${status}"><strong>${recommendation}</strong></p>
+                </div>
+                
+                <div class="result">
+                    <h3>📊 상세 메트릭</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid #444;">
+                            <td><strong>항목</strong></td>
+                            <td><strong>시간</strong></td>
+                            <td><strong>상태</strong></td>
+                        </tr>
+                        <tr>
+                            <td>WASM 다운로드</td>
+                            <td>${results.downloadTime}ms</td>
+                            <td class="${results.downloadTime < 100 ? 'good' : 'warning'}">
+                                ${results.downloadTime < 100 ? '✅' : '⚠️'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>WASM 컴파일</td>
+                            <td>${results.compileTime}ms</td>
+                            <td class="${results.compileTime < 150 ? 'good' : 'warning'}">
+                                ${results.compileTime < 150 ? '✅' : '⚠️'}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>WASM 초기화</td>
+                            <td>${results.initTime}ms</td>
+                            <td class="${results.initTime < 100 ? 'good' : 'warning'}">
+                                ${results.initTime < 100 ? '✅' : '⚠️'}
+                            </td>
+                        </tr>
+                        <tr style="border-top: 2px solid #444;">
+                            <td><strong>키 생성 (SK+PK)</strong></td>
+                            <td><strong>${results.keygenTime}ms</strong></td>
+                            <td class="${results.keygenTime < 50 ? 'good' : (results.keygenTime < 100 ? 'warning' : 'bad')}">
+                                ${results.keygenTime < 50 ? '✅' : (results.keygenTime < 100 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>RLK 생성</strong></td>
+                            <td><strong>${results.rlkTime}ms</strong></td>
+                            <td class="${results.rlkTime < 20 ? 'good' : 'warning'}">
+                                ${results.rlkTime < 20 ? '✅' : '⚠️'}
+                            </td>
+                        </tr>
+                        <tr style="border-top: 2px solid #444;">
+                            <td><strong>Feature 1 암호화</strong></td>
+                            <td><strong>${results.encTimes[0]}ms</strong></td>
+                            <td class="${results.encTimes[0] < 15 ? 'good' : (results.encTimes[0] < 30 ? 'warning' : 'bad')}">
+                                ${results.encTimes[0] < 15 ? '✅' : (results.encTimes[0] < 30 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Feature 2 암호화</td>
+                            <td>${results.encTimes[1]}ms</td>
+                            <td class="${results.encTimes[1] < 15 ? 'good' : (results.encTimes[1] < 30 ? 'warning' : 'bad')}">
+                                ${results.encTimes[1] < 15 ? '✅' : (results.encTimes[1] < 30 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Feature 3 암호화</td>
+                            <td>${results.encTimes[2]}ms</td>
+                            <td class="${results.encTimes[2] < 15 ? 'good' : (results.encTimes[2] < 30 ? 'warning' : 'bad')}">
+                                ${results.encTimes[2] < 15 ? '✅' : (results.encTimes[2] < 30 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Feature 4 암호화</td>
+                            <td>${results.encTimes[3]}ms</td>
+                            <td class="${results.encTimes[3] < 15 ? 'good' : (results.encTimes[3] < 30 ? 'warning' : 'bad')}">
+                                ${results.encTimes[3] < 15 ? '✅' : (results.encTimes[3] < 30 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Feature 5 암호화</td>
+                            <td>${results.encTimes[4]}ms</td>
+                            <td class="${results.encTimes[4] < 15 ? 'good' : (results.encTimes[4] < 30 ? 'warning' : 'bad')}">
+                                ${results.encTimes[4] < 15 ? '✅' : (results.encTimes[4] < 30 ? '⚠️' : '❌')}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="result">
+                    <h3>📋 전체 로그</h3>
+                    <pre>${log.join('\n')}</pre>
+                </div>
+                
+                <div class="result">
+                    <h3>🔍 진단 정보</h3>
+                    <p><strong>WASM 크기:</strong> ${results.wasmSize} MB ${results.wasmSize < 8 ? '✅' : '⚠️ (너무 큼)'}</p>
+                    <p><strong>LogN:</strong> ${results.params.LogN} ${results.params.LogN === 13 ? '✅' : '❌ (13이어야 함)'}</p>
+                    <p><strong>MaxLevel:</strong> ${results.params.MaxLevel} ${results.params.MaxLevel === 5 ? '✅' : '❌ (5여야 함)'}</p>
+                    <p><strong>MaxSlots:</strong> ${results.params.MaxSlots}</p>
+                    <hr>
+                    <p><strong>브라우저:</strong> ${navigator.userAgent}</p>
+                    <p><strong>테스트 시간:</strong> ${new Date().toLocaleString('ko-KR')}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

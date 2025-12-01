@@ -16,12 +16,14 @@ echo "🚀 Compiling Go to WebAssembly..."
 # Check if SIMD flag is set
 if [ "$1" = "simd" ]; then
   echo "⚡ Building with WASM optimizations (satconv,signext)..."
-  GOOS=js GOARCH=wasm GOWASM=satconv,signext go build -o ../frontend/public/main.wasm main.go
+  GOOS=js GOARCH=wasm GOWASM=satconv,signext go build -ldflags="-s -w" -trimpath -o ../frontend/public/main.wasm main.go
   echo "✅ Build completed successfully with optimizations!"
   echo "ℹ️  Note: Full SIMD support requires browser with WASM SIMD enabled"
 else
-  GOOS=js GOARCH=wasm go build -o ../frontend/public/main.wasm main.go
-  echo "✅ Build completed successfully (baseline)!"
+  echo "📦 Building optimized WASM with release flags..."
+  GOOS=js GOARCH=wasm go build -ldflags="-s -w" -trimpath -o ../frontend/public/main.wasm main.go
+  echo "✅ Build completed successfully (optimized)!"
+  echo "💡 Use './build.sh simd' for additional SIMD optimizations"
 fi
 echo "📦 Output files:"
 echo "   - ../frontend/public/main.wasm"

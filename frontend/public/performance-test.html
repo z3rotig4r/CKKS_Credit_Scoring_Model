@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Performance Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1557b0;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #1a73e8;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .log-entry {
+            margin: 3px 0;
+            line-height: 1.4;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .metric:last-child {
+            border-bottom: none;
+        }
+        .metric-label {
+            font-weight: 600;
+            color: #333;
+        }
+        .metric-value {
+            color: #1a73e8;
+            font-weight: 700;
+        }
+        .good {
+            color: #28a745 !important;
+        }
+        .bad {
+            color: #dc3545 !important;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 WASM 성능 테스트</h1>
+        <p class="subtitle">최적화된 WASM 빌드의 실제 성능을 측정합니다</p>
+
+        <div>
+            <button id="runTest" onclick="runPerformanceTest()">▶️ 성능 테스트 실행</button>
+            <button onclick="clearLogs()">🗑️ 로그 지우기</button>
+            <button onclick="location.reload()">🔄 새로고침</button>
+        </div>
+
+        <div class="warning" id="cacheWarning" style="display: none;">
+            ⚠️ <strong>브라우저 캐시 문제가 의심됩니다!</strong><br>
+            Ctrl+Shift+R로 Hard Refresh하거나 Private 모드를 사용하세요.
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <h3>📊 측정 결과</h3>
+            <div id="metrics"></div>
+        </div>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script src="wasm_exec.js"></script>
+    <script>
+        let logs = [];
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push(`[${timestamp}] ${message}`);
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML = logs.map(log => `<div class="log-entry">${log}</div>`).join('');
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLogs() {
+            logs = [];
+            updateLogDisplay();
+            document.getElementById('results').style.display = 'none';
+        }
+
+        async function runPerformanceTest() {
+            const btn = document.getElementById('runTest');
+            btn.disabled = true;
+            clearLogs();
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('cacheWarning').style.display = 'none';
+
+            try {
+                addLog('🚀 WASM 로딩 시작...');
+                const wasmLoadStart = performance.now();
+
+                const go = new Go();
+                const result = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'),
+                    go.importObject
+                );
+                go.run(result.instance);
+
+                const wasmLoadTime = performance.now() - wasmLoadStart;
+                addLog(`✅ WASM 로드 완료: ${wasmLoadTime.toFixed(2)}ms`);
+
+                // 파라미터 확인
+                addLog('📊 CKKS 파라미터 확인...');
+                const params = window.fheGetParamsInfo();
+                addLog(`   LogN: ${params.LogN}, MaxLevel: ${params.MaxLevel}, MaxSlots: ${params.MaxSlots}`);
+
+                if (params.MaxLevel !== 5) {
+                    addLog('❌ WARNING: MaxLevel이 5가 아닙니다! 캐시된 이전 WASM을 사용 중입니다.');
+                    document.getElementById('cacheWarning').style.display = 'block';
+                }
+
+                // 키 생성
+                addLog('🔑 키 생성 중...');
+                const keyGenStart = performance.now();
+                const keys = window.fheKeygen();
+                const keyGenTime = performance.now() - keyGenStart;
+                addLog(`✅ 키 생성 완료: ${keyGenTime.toFixed(2)}ms`);
+
+                // RLK 생성
+                addLog('🔑 RLK 생성 중...');
+                const rlkStart = performance.now();
+                const rlk = window.fheGenRelinearizationKey(keys.secretKey);
+                const rlkTime = performance.now() - rlkStart;
+                addLog(`✅ RLK 생성 완료: ${rlkTime.toFixed(2)}ms`);
+
+                // 암호화 테스트
+                const features = [0.5, 0.75, 0.3, 0.85, 0.2];
+                addLog(`🔒 ${features.length}개 특성 암호화 중...`);
+                
+                const encryptStart = performance.now();
+                const encryptedFeatures = [];
+                const featureTimes = [];
+
+                for (let i = 0; i < features.length; i++) {
+                    const featureStart = performance.now();
+                    const encrypted = window.fheEncrypt(keys.publicKey, features[i]);
+                    const featureTime = performance.now() - featureStart;
+                    featureTimes.push(featureTime);
+                    encryptedFeatures.push(encrypted);
+                    addLog(`   Feature ${i+1}/${features.length}: ${featureTime.toFixed(2)}ms`);
+                }
+
+                const totalEncryptTime = performance.now() - encryptStart;
+                const avgEncryptTime = totalEncryptTime / features.length;
+
+                addLog(`✅ 암호화 완료: ${totalEncryptTime.toFixed(2)}ms (평균: ${avgEncryptTime.toFixed(2)}ms/feature)`);
+
+                // 결과 표시
+                const metricsDiv = document.getElementById('metrics');
+                const isGood = avgEncryptTime < 10;
+                
+                metricsDiv.innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">WASM 로드 시간</span>
+                        <span class="metric-value">${wasmLoadTime.toFixed(2)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">키 생성 시간</span>
+                        <span class="metric-value">${keyGenTime.toFixed(2)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">RLK 생성 시간</span>
+                        <span class="metric-value">${rlkTime.toFixed(2)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">총 암호화 시간</span>
+                        <span class="metric-value ${isGood ? 'good' : 'bad'}">${totalEncryptTime.toFixed(2)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">특성당 평균 시간</span>
+                        <span class="metric-value ${isGood ? 'good' : 'bad'}">${avgEncryptTime.toFixed(2)} ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">예상 E2E 시간</span>
+                        <span class="metric-value">${(keyGenTime + totalEncryptTime + 131 + 4).toFixed(2)} ms</span>
+                    </div>
+                `;
+
+                document.getElementById('results').style.display = 'block';
+
+                if (!isGood) {
+                    addLog('');
+                    addLog('⚠️  성능이 예상보다 느립니다!');
+                    addLog('   해결 방법:');
+                    addLog('   1. Ctrl+Shift+R로 Hard Refresh');
+                    addLog('   2. 브라우저 캐시 완전 삭제');
+                    addLog('   3. Private/Incognito 모드로 테스트');
+                    document.getElementById('cacheWarning').style.display = 'block';
+                } else {
+                    addLog('');
+                    addLog('🎉 성능이 정상입니다!');
+                    addLog(`   특성당 ${avgEncryptTime.toFixed(2)}ms는 최적화된 성능입니다.`);
+                }
+
+            } catch (error) {
+                addLog(`❌ 에러 발생: ${error.message}`);
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // 페이지 로드 시 자동 실행
+        window.addEventListener('load', () => {
+            addLog('✅ 페이지 로드 완료');
+            addLog('▶️ "성능 테스트 실행" 버튼을 클릭하세요');
+        });
+    </script>
+</body>
+</html>

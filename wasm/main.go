@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	params ckks.Parameters
+	params  ckks.Parameters
+	encoder *ckks.Encoder // ⚡ 전역 인코더 캐시 (재사용)
 )
 
 func init() {
@@ -26,6 +27,11 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create CKKS parameters: %v", err))
 	}
+
+	// ⚡ Encoder 사전 생성 (100ms 절약!)
+	encoder = ckks.NewEncoder(params)
+	fmt.Println("✅ CKKS Encoder initialized (cached for reuse)")
+	fmt.Println("🔖 WASM Version: 2.0-ENCODER-CACHED (2025-12-01-22:45)")
 }
 
 // keygenWrapper: FHE 키 쌍 생성
@@ -467,6 +473,9 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 		reject := promiseArgs[1]
 
 		go func() {
+			// ⏱️ 전체 시작 시간
+			totalStart := js.Global().Get("performance").Call("now").Float()
+
 			defer func() {
 				if r := recover(); r != nil {
 					errorConstructor := js.Global().Get("Error")
@@ -476,6 +485,7 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 			}()
 
 			// Public Key 역직렬화
+			t0 := js.Global().Get("performance").Call("now").Float()
 			pkBytes := make([]byte, pkArray.Get("length").Int())
 			js.CopyBytesToGo(pkBytes, pkArray)
 
@@ -486,9 +496,12 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 				reject.Invoke(errorObject)
 				return
 			}
+			t1 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] PK unmarshal: %.2fms\n", t1-t0)
 
 			// 평문 인코딩 (complex128로 변환)
-			encoder := ckks.NewEncoder(params)
+			// ⚡ 전역 encoder 재사용 (캐싱 효과!)
+			t2 := js.Global().Get("performance").Call("now").Float()
 			values := make([]complex128, params.MaxSlots())
 			values[0] = complex(plaintext, 0) // 실수를 복소수로 변환
 			pt := ckks.NewPlaintext(params, params.MaxLevel())
@@ -498,10 +511,18 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 				reject.Invoke(errorObject)
 				return
 			}
+			t3 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] Encoding: %.2fms\n", t3-t2)
 
 			// 암호화
+			t4 := js.Global().Get("performance").Call("now").Float()
 			encryptor := ckks.NewEncryptor(params, pk)
+			t5 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] Encryptor creation: %.2fms\n", t5-t4)
+
 			ct, err := encryptor.EncryptNew(pt)
+			t6 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] Actual encryption: %.2fms\n", t6-t5)
 			if err != nil {
 				errorConstructor := js.Global().Get("Error")
 				errorObject := errorConstructor.New(fmt.Sprintf("Failed to encrypt: %v", err))
@@ -510,7 +531,10 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 			}
 
 			// 암호문 직렬화
+			t7 := js.Global().Get("performance").Call("now").Float()
 			ctBytes, err := ct.MarshalBinary()
+			t8 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] CT marshal: %.2fms\n", t8-t7)
 			if err != nil {
 				errorConstructor := js.Global().Get("Error")
 				errorObject := errorConstructor.New(fmt.Sprintf("Failed to marshal ciphertext: %v", err))
@@ -519,8 +543,14 @@ func encryptWrapper(this js.Value, args []js.Value) interface{} {
 			}
 
 			// JavaScript Uint8Array로 변환
+			t9 := js.Global().Get("performance").Call("now").Float()
 			ctArray := js.Global().Get("Uint8Array").New(len(ctBytes))
 			js.CopyBytesToJS(ctArray, ctBytes)
+			t10 := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] JS copy: %.2fms\n", t10-t9)
+
+			totalEnd := js.Global().Get("performance").Call("now").Float()
+			fmt.Printf("  [Go] ⚡ TOTAL: %.2fms\n", totalEnd-totalStart)
 
 			resolve.Invoke(ctArray)
 		}()
@@ -586,7 +616,7 @@ func decryptWrapper(this js.Value, args []js.Value) interface{} {
 			pt := decryptor.DecryptNew(ct)
 
 			// 디코딩
-			encoder := ckks.NewEncoder(params)
+			// ⚡ 전역 encoder 재사용
 			values := make([]complex128, params.MaxSlots())
 			if err := encoder.Decode(pt, values); err != nil {
 				errorConstructor := js.Global().Get("Error")
@@ -656,7 +686,7 @@ func encryptVectorWrapper(this js.Value, args []js.Value) interface{} {
 			}
 
 			// 평문 인코딩
-			encoder := ckks.NewEncoder(params)
+			// ⚡ 전역 encoder 재사용
 			pt := ckks.NewPlaintext(params, params.MaxLevel())
 			if err := encoder.Encode(values, pt); err != nil {
 				errorConstructor := js.Global().Get("Error")

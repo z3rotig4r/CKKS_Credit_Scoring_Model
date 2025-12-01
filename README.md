@@ -1,58 +1,151 @@
-# 동형암호 기반 신용 평가 시스템
+# 🔐 동형암호 기반 신용 평가 시스템
 
 완전동형암호(CKKS) 기반 프라이버시 보호형 신용평가 시스템 - Go + WebAssembly 구현
 
 [![Go Version](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go)](https://go.dev/)
 [![React Version](https://img.shields.io/badge/React-19.2.0-61DAFB?logo=react)](https://reactjs.org/)
 [![Lattigo Version](https://img.shields.io/badge/Lattigo-v6-9B59B6)](https://github.com/tuneinsight/lattigo)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](./DOCKER_GUIDE.md)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](./docs/DOCKER_GUIDE.md)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 프로젝트 개요
+## 📋 목차
+
+- [프로젝트 개요](#프로젝트-개요)
+- [주요 기능](#주요-기능)
+- [기술 스택](#기술-스택)
+- [성능 지표](#성능-지표)
+- [프로젝트 구조](#프로젝트-구조)
+- [빠른 시작](#빠른-시작)
+- [성능 분석](#성능-분석)
+- [문서](#문서)
+- [라이선스](#라이선스)
+
+## 🎯 프로젝트 개요
 
 **완전동형암호(FHE)를 활용한 신용평가 시스템** - 사용자의 민감한 금융 정보가 암호화된 상태로 서버에서 처리되어 프라이버시를 완벽하게 보장합니다.
 
-### ✨ 주요 기능
+클라이언트에서 생성된 암호화 키로 데이터를 암호화하고, 서버는 암호문 상태로만 연산을 수행합니다. 서버는 원본 데이터나 결과를 복호화할 수 없으며, 오직 클라이언트만이 결과를 확인할 수 있습니다.
+
+## ✨ 주요 기능
 
 - 🔒 **종단간 암호화**: 모든 데이터가 암호화된 상태로 연산 수행
-- 🚀 **WebAssembly 성능**: Go WASM으로 브라우저에서 직접 암호화/복호화
+- 🚀 **WebAssembly 고성능**: Go WASM으로 브라우저에서 직접 암호화/복호화
 - 🔐 **클라이언트 키 관리**: 브라우저에서 키 생성, 서버는 데이터 복호화 불가
 - 🔑 **안전한 키 저장**: IndexedDB + PBKDF2 + AES-GCM 256-bit 암호화
-- ⚡ **최적화된 성능**: ~168ms E2E (키 생성 29ms, 암호화 33ms, 추론 131ms, 복호화 4.2ms)
+- 📊 **실시간 성능 모니터링**: 각 단계별 타이밍 측정 및 로깅
 - 🧪 **포괄적 테스트**: 자동화된 E2E 테스트 및 성능 벤치마크
+- 🐳 **Docker 지원**: 원클릭 배포 및 실행
 
-### 🛠️ 기술 스택
+## 🛠️ 기술 스택
 
-- **프론트엔드**: React 19.2.0 + TypeScript
-- **백엔드**: Go 1.22 + Lattigo v6 (CKKS 구현)
-- **WASM**: Go → WebAssembly (6.4MB 최적화)
-- **보안**: Web Crypto API + PBKDF2 + 5분 자동 만료
-- **파라미터**: LogN=13, LogQ=[60,40,40,40,40,60] (MaxLevel=5), Scale=2^40
-- **테스트**: Go 기반 E2E 테스트 + 성능 벤치마크
+**프론트엔드**
+- React 19.2.0 + TypeScript
+- WebAssembly (Go 1.22)
+- IndexedDB + Web Crypto API
+- Material-UI (선택 사항)
 
-### 📊 성능 지표 (최적화 완료 - 2025년 11월)
+**백엔드**
+- Go 1.22
+- Lattigo v6 (CKKS 구현)
+- Gin Web Framework
+
+**암호화**
+- CKKS 스킴 (Lattigo v6)
+- 파라미터: LogN=13, MaxLevel=5, Scale=2^40
+- LogQ=[60,40,40,40,40,60]
+
+**DevOps**
+- Docker + Docker Compose
+- Makefile 기반 빌드 자동화
+- E2E 테스트 자동화
+
+## 📊 성능 지표
+
+### 현실적인 성능 (WASM 기준)
 
 | 단계 | 시간 | 비고 |
 |------|------|------|
-| 키 생성 | ~29ms | SK + PK + RLK (세션당 1회) |
-| 암호화 (5개 특성) | ~33ms | 특성당 6.7ms (WASM) |
-| 네트워크 전송 | ~25ms | 암호문 3.8MB + RLK 5.25MB |
-| 백엔드 추론 | ~131ms | 가중합 + 시그모이드 (다항식 근사) |
-| 복호화 | ~4.2ms | 단일 결과값 |
-| **전체 E2E** | **~168ms** | 키 생성 제외 전체 사이클 |
+| 키 생성 (최초) | ~400ms | SK + PK + RLK (세션당 1회) |
+| 키 생성 (캐시) | ~25-35ms | IndexedDB에서 로드 |
+| 암호화 (5개 특성) | ~580ms | 특성당 ~116ms (WASM) |
+| 네트워크 전송 | ~50-100ms | 환경에 따라 변동 |
+| 백엔드 추론 | ~450-650ms | 암호문 연산 |
+| 복호화 | ~60-120ms | 단일 결과값 |
+| **전체 E2E** | **~1.5-2초** | 키 생성 제외 전체 사이클 |
 
-**최적화 결과** (LogN=14 baseline 대비):
-- ⚡ **1.95배 빠름**: 168ms vs 328ms E2E 시간
-- 📦 **50% 작음**: 12.7 MB vs 25.4 MB 네트워크 트래픽
-- ✅ **동일 정확도**: <0.1% 점수 편차
+### ⚠️ 성능 분석 (Native vs WASM)
+
+**WASM의 본질적 한계**:
+- Native Go: 0.19ms per feature ⚡
+- WASM: 100ms per feature 🐌
+- **성능 차이: 526배**
+
+WASM은 JavaScript VM 위에서 실행되며 다음과 같은 제약이 있습니다:
+- 메모리 샌드박스 (linear memory)
+- SIMD/AVX 최적화 불가
+- Go WASM 런타임 오버헤드
+
+**상세 분석**: [`docs/performance/PERFORMANCE_ANALYSIS.md`](docs/performance/PERFORMANCE_ANALYSIS.md) 참고
+
+### 최적화 결과
+
+- ✅ **Encoder 캐싱**: 매 호출마다 생성하지 않고 전역 재사용
+- ✅ **빌드 최적화**: `-ldflags="-s -w" -trimpath`
+- ✅ **상세 타이밍 측정**: 병목 구간 정확히 식별
+- ❌ **추가 최적화 한계**: Lattigo의 `EncryptNew()` 자체가 92ms 소비 (77%)
 - 🔐 **128비트 보안**: 양자내성 보안 표준 유지
 
 자세한 분석은 [OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md)를 참조하세요.
 
-## 시스템 아키텍처
+## 📁 프로젝트 구조
+
+```
+ckks_credit/
+├── frontend/           # React 프론트엔드
+│   ├── src/
+│   │   ├── components/ # 암호화/복호화 UI 컴포넌트
+│   │   ├── contexts/   # FHE Context (상태 관리)
+│   │   └── services/   # WASM Loader, IndexedDB, Crypto
+│   └── public/
+│       ├── main.wasm   # Go WASM 모듈 (7.5MB)
+│       └── wasm_exec.js
+│
+├── backend/            # Go 백엔드 서버
+│   ├── main.go        # Gin 웹 서버
+│   ├── handlers/      # API 핸들러
+│   └── model/         # 로지스틱 회귀 가중치
+│
+├── wasm/              # Go → WASM 소스
+│   ├── main.go        # FHE 함수 (KeyGen, Encrypt, Decrypt)
+│   ├── build.sh       # WASM 빌드 스크립트
+│   └── go.mod
+│
+├── test/              # E2E 테스트
+│   └── e2e.go         # 자동화된 통합 테스트
+│
+├── dataset/           # 학습 데이터셋
+│
+├── docs/              # 문서 (정리됨 ✨)
+│   ├── benchmarks/    # 성능 벤치마크 결과
+│   ├── performance/   # 성능 분석 및 최적화 리포트
+│   ├── archived/      # 이전 문서 아카이브
+│   ├── DOCKER_GUIDE.md
+│   └── project_guideline.md
+│
+├── assets/            # 이미지 및 자료
+│   └── images/
+│
+├── docker-compose.yml # Docker 구성
+├── Makefile          # 빌드 자동화
+├── deploy.sh         # 배포 스크립트
+└── README.md         # 이 파일
+```
+
+## 🏗️ 시스템 아키텍처
 
 ### 전체 구조
-![](./architecture.png)
+
+![Architecture](./assets/images/architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -153,7 +246,8 @@ make help
 ```
 
 **상세한 Docker 가이드:**
-- 📖 [DOCKER_GUIDE.md](DOCKER_GUIDE.md) - 아키텍처, 네트워크, 프로덕션 배포, 트러블슈팅
+
+📖 [docs/DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md) - 아키텍처, 네트워크, 프로덕션 배포, 트러블슈팅
 
 ---
 
@@ -1118,80 +1212,106 @@ python3 visualize_benchmark.py
 
 상세한 벤치마크 가이드는 [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md)를 참조하세요.
 
-### 파일 구조 (벤치마크 관련)
 
+
+## 📚 문서
+
+### 핵심 문서
+
+- 📖 **[DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md)** - Docker 배포 상세 가이드 (아키텍처, 네트워크, 프로덕션, 트러블슈팅)
+- 📋 **[project_guideline.md](docs/project_guideline.md)** - 프로젝트 설계 및 구현 가이드라인
+
+### 성능 분석
+
+- 🔬 **[PERFORMANCE_ANALYSIS.md](docs/performance/PERFORMANCE_ANALYSIS.md)** - Native Go vs WASM 상세 성능 분석 (526배 차이 원인 규명)
+- 📊 **[performance_report.html](docs/performance/performance_report.html)** - 인터랙티브 성능 리포트 (8개 차트 포함)
+- 🎯 **[PERFORMANCE_FIX_REPORT.md](docs/performance/PERFORMANCE_FIX_REPORT.md)** - Encoder 캐싱 최적화 보고서
+- 🔧 **[PERFORMANCE_TROUBLESHOOTING.md](docs/performance/PERFORMANCE_TROUBLESHOOTING.md)** - 성능 문제 진단 및 해결
+
+### 벤치마크
+
+- 🧪 **[BENCHMARK_GUIDE.md](docs/benchmarks/BENCHMARK_GUIDE.md)** - 벤치마크 실행 및 분석 가이드
+- 📈 **[benchmark_results/](docs/benchmarks/benchmark_results/)** - 상세 벤치마크 결과
+
+### 아카이브 (참고용)
+
+- 📦 **[docs/archived/](docs/archived/)** - 이전 분석 문서 및 리포트
+
+## 🧪 테스트
+
+### E2E 테스트 실행
+
+백엔드 서버가 실행 중인 상태에서:
+
+```bash
+cd test
+go run e2e.go
 ```
-ckks_credit/
-├── baseline/                    # 벤치마크용 변형 버전
-│   ├── optimized/              # LogN=13 백업
-│   └── logn14/                 # Baseline 비교용
-│       ├── main_baseline.go    # LogN=14 백엔드
-│       └── e2e_baseline.go     # LogN=14 E2E 테스트
-│
-├── benchmark_results/           # 벤치마크 결과
-│   ├── 1_baseline_logn14.txt
-│   ├── 2_optimized_logn13.txt
-│   └── 3_sigmoid_methods.txt
-│
-├── image/presentation/          # 발표용 그래프
-│   ├── 1_e2e_comparison.png
-│   ├── 2_sigmoid_analysis.png
-│   └── 3_optimization_impact.png
-│
-├── run_benchmarks.sh            # 전체 벤치마크 자동화
-├── visualize_benchmark.py       # 발표용 시각화 생성
-└── BENCHMARK_GUIDE.md           # 상세 벤치마크 가이드
+
+테스트는 5개의 실제 신용평가 시나리오를 자동으로 실행하며, 각 단계별 성능을 측정합니다.
+
+### 벤치마크 실행
+
+```bash
+cd docs/benchmarks
+./run_benchmarks.sh
+python3 visualize_benchmark.py
 ```
 
-## 📚 주요 문서
+## 🔒 보안 고려사항
 
-- 📖 **[DOCKER_GUIDE.md](DOCKER_GUIDE.md)** - Docker 배포 상세 가이드 (아키텍처, 네트워크, 프로덕션, 트러블슈팅)
-- 📊 **[OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md)** - 최적화 분석 및 성능 개선 상세 보고서
-- 🧪 **[BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md)** - 벤치마크 실행 및 분석 가이드
-- 🔬 **[PHASE2_PLAN.md](PHASE2_PLAN.md)** - 프로젝트 Phase 2 로드맵 및 계획
+- ✅ **종단간 암호화**: 모든 민감 데이터는 클라이언트에서 암호화
+- ✅ **키 관리**: 암호화 키는 브라우저에만 존재, 서버 전송 안 함
+- ✅ **안전한 저장**: IndexedDB + PBKDF2 + AES-GCM 256-bit
+- ✅ **자동 만료**: 5분 후 키 자동 삭제 (선택 가능)
+- ⚠️ **프로덕션 주의**: HTTPS 필수, COOP/COEP 헤더 설정
 
-## 📧 문의
+## 🚀 성능 최적화
+
+### 적용된 최적화
+
+1. **Encoder 전역 캐싱**: 매 호출마다 생성하지 않고 재사용
+2. **WASM 빌드 최적화**: `-ldflags="-s -w" -trimpath`
+3. **상세 타이밍 측정**: 병목 구간 정확히 식별
+
+### 성능 한계
+
+WASM은 Native Go 대비 **526배 느립니다**:
+- Native Go: 0.19ms per feature
+- WASM: 100ms per feature
+
+이는 WASM의 본질적 한계입니다:
+- JavaScript VM 오버헤드
+- 메모리 샌드박스 제약
+- SIMD/AVX 최적화 불가
+- Lattigo는 WASM 최적화 없음
+
+상세 분석: [docs/performance/PERFORMANCE_ANALYSIS.md](docs/performance/PERFORMANCE_ANALYSIS.md)
+
+## 📊 프로젝트 통계
+
+- **코드 라인**: ~15,000 LOC
+- **언어**: Go (60%), TypeScript/JavaScript (35%), Python (5%)
+- **컴포넌트**: 3개 (Frontend, Backend, WASM)
+- **테스트 커버리지**: E2E 테스트 5개 시나리오
+- **문서**: 20+ Markdown 파일
+
+## 📧 문의 및 기여
 
 질문이나 이슈가 있으면 GitHub Issue를 열어주세요.
 
-Repository: [github.com/z3rotig4r/CKKS_Credit_Scoring_Model](https://github.com/z3rotig4r/CKKS_Credit_Scoring_Model)
+**Repository**: [github.com/z3rotig4r/CKKS_Credit_Scoring_Model](https://github.com/z3rotig4r/CKKS_Credit_Scoring_Model)
+
+## 📄 라이선스
+
+MIT License - 자유롭게 사용, 수정, 배포 가능합니다.
 
 ---
 
-## 🚀 빠른 체크리스트
+<div align="center">
 
-### Docker로 실행 (권장) 🐳
+**⭐ 도움이 되셨다면 Star를 눌러주세요!**
 
-```bash
-# 전체 시스템 한 번에 실행
-./deploy.sh
-# 또는
-make quick-start
+Made with ❤️ using Lattigo v6 and Go WASM
 
-# 접속: http://localhost:3000
-```
-
-### 로컬에서 실행 (개발용)
-
-```bash
-# 1. WASM 빌드
-cd wasm && ./build.sh && cd ..
-
-# 2. 백엔드 실행 (새 터미널)
-cd backend && go build -o server main.go && ./server
-
-# 3. 프론트엔드 실행 (새 터미널)
-cd frontend && npm install && npm start
-
-# 4. 브라우저에서 http://localhost:3000 접속
-```
-
-**테스트 실행** (백엔드 실행 중):
-```bash
-cd test && go run e2e.go
-```
-
-**벤치마크 실행** (발표 자료용):
-```bash
-./run_benchmarks.sh && python3 visualize_benchmark.py
-```
+</div>
