@@ -1,5 +1,5 @@
 // 개발 환경에서는 HTTP 사용 (프로덕션에서는 HTTPS 필수)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+const API_BASE_URL = '';
 
 export interface InferenceRequest {
   encryptedFeatures: string[]; // Base64 encoded

@@ -5,6 +5,6 @@
 # Proxy 설정
 [[redirects]]
   from = "/api/*"
-  to = "http://141.164.42.210:8080/:splat"
+  to = "http://141.164.42.210:8080/api/:splat" 
   status = 200
   force = true
