@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+# Proxy 설정
+[[redirects]]
+  from = "/api/*"
+  to = "http://141.164.42.210:8080/:splat"
+  status = 200
+  force = true
