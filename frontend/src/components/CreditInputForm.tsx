@@ -460,7 +460,7 @@ const CreditInputForm: React.FC = () => {
                   Performance Metrics
                 </h3>
                 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                   {timings.keygenTime && (
                     <div className="bg-white rounded-lg p-4 text-center border border-cau-light-gray/30">
                       <p className="text-xs text-cau-gray mb-1">Key Generation</p>
@@ -479,6 +479,12 @@ const CreditInputForm: React.FC = () => {
                       <p className="text-lg font-bold text-accent">{timings.inferenceTime.toFixed(0)}<span className="text-xs text-cau-gray ml-1">ms</span></p>
                     </div>
                   )}
+                  {timings.networkTime !== undefined && (
+                    <div className="bg-white rounded-lg p-4 text-center border border-cau-light-gray/30">
+                      <p className="text-xs text-cau-gray mb-1">Network</p>
+                      <p className="text-lg font-bold text-orange-500">{timings.networkTime.toFixed(0)}<span className="text-xs text-cau-gray ml-1">ms</span></p>
+                    </div>
+                  )}
                   {timings.decryptionTime && (
                     <div className="bg-white rounded-lg p-4 text-center border border-cau-light-gray/30">
                       <p className="text-xs text-cau-gray mb-1">Decryption</p>
@@ -488,7 +494,7 @@ const CreditInputForm: React.FC = () => {
                   {(timings.encryptionTime && timings.inferenceTime && timings.decryptionTime) && (
                     <div className="bg-gradient-to-br from-primary to-accent rounded-lg p-4 text-center text-white">
                       <p className="text-xs mb-1 opacity-90">Total Time</p>
-                      <p className="text-lg font-bold">{(timings.encryptionTime + timings.inferenceTime + timings.decryptionTime).toFixed(0)}<span className="text-xs ml-1 opacity-75">ms</span></p>
+                      <p className="text-lg font-bold">{(timings.encryptionTime + timings.inferenceTime + (timings.networkTime || 0) + timings.decryptionTime).toFixed(0)}<span className="text-xs ml-1 opacity-75">ms</span></p>
                     </div>
                   )}
                 </div>

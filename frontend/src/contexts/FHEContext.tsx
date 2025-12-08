@@ -9,7 +9,8 @@ export interface TimingStats {
   keygenTime?: number;
   encryptionTime?: number;
   decryptionTime?: number;
-  inferenceTime?: number;
+  inferenceTime?: number;      // Server-side inference time (from backend)
+  networkTime?: number;        // Network round-trip time (total - server time)
 }
 
 interface FHEContextType {
@@ -356,16 +357,20 @@ export const FHEProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.log('🔄 Sending to backend with RLK for inference...');
         const startTime = performance.now();
 
-        const encryptedScore = await creditAPI.computeScore(encryptedFeatures, keys.relinearizationKey);
+        const result = await creditAPI.computeScore(encryptedFeatures, keys.relinearizationKey);
 
         const endTime = performance.now();
-        const inferenceTime = endTime - startTime;
+        const totalRoundTrip = endTime - startTime;
+        const serverInferenceTime = result.serverInferenceTime;
+        const networkTime = totalRoundTrip - serverInferenceTime;
 
-        console.log(`⏱️ Backend inference time: ${inferenceTime.toFixed(2)}ms`);
+        console.log(`⏱️ Total round-trip: ${totalRoundTrip.toFixed(2)}ms`);
+        console.log(`⏱️ Server inference time: ${serverInferenceTime.toFixed(2)}ms`);
+        console.log(`⏱️ Network time: ${networkTime.toFixed(2)}ms`);
 
-        setTimings((prev) => ({ ...prev, inferenceTime }));
+        setTimings((prev) => ({ ...prev, inferenceTime: serverInferenceTime, networkTime }));
 
-        return encryptedScore;
+        return result.encryptedScore;
       } catch (err: any) {
         console.error('Backend communication failed:', err);
         throw new Error(`Backend error: ${err.message}`);

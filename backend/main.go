@@ -62,8 +62,9 @@ type PackedInferenceRequest struct {
 }
 
 type InferenceResponse struct {
-	EncryptedScore string `json:"encryptedScore"`
-	Timestamp      int64  `json:"timestamp"`
+	EncryptedScore      string  `json:"encryptedScore"`
+	Timestamp           int64   `json:"timestamp"`
+	ServerInferenceTime float64 `json:"serverInferenceTime"` // Server-side inference time in ms
 }
 
 func init() {
@@ -226,9 +227,13 @@ func inferenceHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("⏱️  Serialization: %.2f ms (%d bytes)",
 		float64(serializationTime.Microseconds())/1000.0, len(resultBytes))
 
+	// Calculate server-side processing time (deserialization + inference + serialization)
+	serverProcessingTime := float64(deserializationTime.Microseconds()+inferenceTime.Microseconds()+serializationTime.Microseconds()) / 1000.0
+
 	response := InferenceResponse{
-		EncryptedScore: resultB64,
-		Timestamp:      time.Now().Unix(),
+		EncryptedScore:      resultB64,
+		Timestamp:           time.Now().Unix(),
+		ServerInferenceTime: serverProcessingTime,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

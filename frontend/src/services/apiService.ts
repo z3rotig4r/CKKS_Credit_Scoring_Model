@@ -9,10 +9,16 @@ export interface InferenceRequest {
 export interface InferenceResponse {
   encryptedScore: string; // Base64 encoded
   timestamp: number;
+  serverInferenceTime: number; // Server-side inference time in ms
+}
+
+export interface ComputeScoreResult {
+  encryptedScore: Uint8Array;
+  serverInferenceTime: number;
 }
 
 export const creditAPI = {
-  async computeScore(encryptedFeatures: Uint8Array[], relinearizationKey: Uint8Array): Promise<Uint8Array> {
+  async computeScore(encryptedFeatures: Uint8Array[], relinearizationKey: Uint8Array): Promise<ComputeScoreResult> {
     // Convert Uint8Array to base64
     const base64Features = encryptedFeatures.map(arr => {
       // Handle large arrays by chunking to avoid call stack overflow
@@ -67,7 +73,7 @@ export const creditAPI = {
       bytes[i] = binaryString.charCodeAt(i);
     }
     
-    return bytes;
+    return { encryptedScore: bytes, serverInferenceTime: data.serverInferenceTime };
   },
 
   async healthCheck(): Promise<boolean> {
