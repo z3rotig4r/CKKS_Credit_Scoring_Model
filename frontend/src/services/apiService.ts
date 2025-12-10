@@ -1,5 +1,5 @@
-// Backend URL - 프로덕션에서는 백엔드 서버 직접 연결 (Netlify 프록시는 body 크기 제한으로 사용 불가)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://141.164.42.210:8080';
+// Backend URL - Cloudflare Tunnel을 통한 HTTPS 연결
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://plate-pdt-cartridges-leon.trycloudflare.com';
 
 export interface InferenceRequest {
   encryptedFeatures: string[]; // Base64 encoded
