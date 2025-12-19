@@ -99,6 +99,163 @@ WASM은 JavaScript VM 위에서 실행되며 다음과 같은 제약이 있습�
 
 자세한 분석은 [OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md)를 참조하세요.
 
+## 🔐 Lattigo v6 설치 및 사용법
+
+### Lattigo란?
+
+[Lattigo](https://github.com/tuneinsight/lattigo)는 Go 언어로 작성된 격자 기반 동형암호 라이브러리입니다. CKKS, BGV, BFV 스킴을 지원하며, 이 프로젝트에서는 **CKKS (Cheon-Kim-Kim-Song)** 스킴을 사용합니다.
+
+### 설치 방법
+
+#### 1. Go 설치 (1.22 이상 필요)
+
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install golang-go
+
+# macOS (Homebrew)
+brew install go
+
+# 버전 확인
+go version  # go1.22 이상 필요
+```
+
+#### 2. Lattigo v6 설치
+
+```bash
+# 프로젝트 디렉토리에서
+go mod init your-project-name
+
+# Lattigo v6 설치
+go get github.com/tuneinsight/lattigo/v6@latest
+
+# 의존성 정리
+go mod tidy
+```
+
+### CKKS 기본 사용법
+
+#### 파라미터 설정
+
+```go
+import (
+    "github.com/tuneinsight/lattigo/v6/core/rlwe"
+    "github.com/tuneinsight/lattigo/v6/schemes/ckks"
+)
+
+// CKKS 파라미터 설정
+params, err := ckks.NewParametersFromLiteral(ckks.ParametersLiteral{
+    LogN:            13,                            // 다항식 차수 (2^13 = 8192)
+    LogQ:            []int{60, 40, 40, 40, 40, 60}, // 모듈러스 체인 (MaxLevel = 5)
+    LogP:            []int{61},                     // 특수 모듈러스
+    LogDefaultScale: 40,                            // 스케일 (2^40)
+})
+if err != nil {
+    panic(err)
+}
+```
+
+#### 키 생성
+
+```go
+// 키 생성기 초기화
+kgen := rlwe.NewKeyGenerator(params)
+
+// 비밀키 생성
+sk := kgen.GenSecretKeyNew()
+
+// 공개키 생성
+pk := kgen.GenPublicKeyNew(sk)
+
+// 재선형화 키 생성 (곱셈 연산용)
+rlk := kgen.GenRelinearizationKeyNew(sk)
+
+// 평가 키 세트 생성
+evk := rlwe.NewMemEvaluationKeySet(rlk)
+```
+
+#### 암호화/복호화
+
+```go
+// 인코더, 암호화기, 복호화기 초기화
+encoder := ckks.NewEncoder(params)
+encryptor := ckks.NewEncryptor(params, pk)
+decryptor := ckks.NewDecryptor(params, sk)
+
+// 평문 인코딩 (복소수 슬라이스)
+values := make([]complex128, params.MaxSlots())
+values[0] = complex(0.75, 0)  // 실수값을 복소수로 변환
+
+pt := ckks.NewPlaintext(params, params.MaxLevel())
+encoder.Encode(values, pt)
+
+// 암호화
+ct, err := encryptor.EncryptNew(pt)
+if err != nil {
+    panic(err)
+}
+
+// 복호화
+ptResult := decryptor.DecryptNew(ct)
+decodedValues := make([]complex128, params.MaxSlots())
+encoder.Decode(ptResult, decodedValues)
+
+result := real(decodedValues[0])  // 실수 부분 추출
+```
+
+#### 동형 연산
+
+```go
+// 평가기 초기화
+evaluator := ckks.NewEvaluator(params, evk)
+
+// 암호문 + 평문 덧셈
+ctSum, err := evaluator.AddNew(ct1, ct2)
+
+// 암호문 × 상수 곱셈
+ctScaled, err := evaluator.MulNew(ct, constant)
+evaluator.Relinearize(ctScaled, ctScaled)  // 재선형화
+evaluator.Rescale(ctScaled, ctScaled)       // 스케일 조정
+
+// 암호문 × 암호문 곱셈
+ctMul, err := evaluator.MulNew(ct1, ct2)
+evaluator.Relinearize(ctMul, ctMul)
+evaluator.Rescale(ctMul, ctMul)
+```
+
+### 이 프로젝트에서의 활용
+
+#### WASM 빌드 (브라우저용)
+
+```bash
+cd wasm
+./build.sh  # Go → WASM 컴파일
+```
+
+#### 백엔드 (네이티브 Go)
+
+```bash
+cd backend
+go build -o server main.go
+./server
+```
+
+### 주요 파라미터 설명
+
+| 파라미터 | 값 | 설명 |
+|---------|-----|------|
+| `LogN` | 13 | 다항식 차수 = 2^13 = 8192 |
+| `LogQ` | [60,40,40,40,40,60] | 모듈러스 체인 (MaxLevel=5) |
+| `LogP` | [61] | 특수 모듈러스 (키 스위칭용) |
+| `LogDefaultScale` | 40 | 정밀도 스케일 = 2^40 |
+| `MaxSlots` | 4096 | 동시 처리 가능한 값 개수 |
+
+### 보안 수준
+
+- **128-bit 보안**: 현재 파라미터로 128비트 보안 보장
+- **양자 내성**: 격자 기반 암호로 양자 컴퓨터 공격에 안전
+- **LogN=13 권장**: LogN<12는 보안 취약, LogN>14는 성능 저하
+
 ## 📁 프로젝트 구조
 
 ```
